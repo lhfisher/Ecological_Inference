@@ -1,0 +1,829 @@
+---
+title: "Analysis of Measles data in Germany"
+subtitle: "From Ecological inference for infectious disease data, with application to vaccination strategies"
+author: ""
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: github_document
+---
+
+    
+```{r setup, echo=F,  message=F, warning=F}
+library(knitr)
+# IF compiling using R notebook, these options will clean up the output
+opts_chunk$set(comment=NA, echo=F, cache=T, tidy=F, message=F, warning=F, dev=c('png', 'pdf'), dpi=300, results='hide', fig.align = 'center', fig.height=8.5, fig.width=8.5)
+options(width=100)
+options(mc.cores = parallel::detectCores())
+
+
+library(surveillance); library(numDeriv); library(RColorBrewer); library(rstan)
+
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
+
+expit=function(x){exp(x)/(1+exp(x))}
+logit=function(x){log(x/(1-x))}
+
+
+##--------------------------------##
+#### Vaccine coverage estimates ####
+##--------------------------------##
+## load data about MMR coverage from surveillance package
+data("MMRcoverageDE")
+
+## At least one dose of MMR - following Herzog
+X1=with(MMRcoverageDE[1:16, ], withVaccDocument*MMR1+(1-withVaccDocument)*MMR1*0.5)
+## At least two doses of MMR - following Herzog
+X2=with(MMRcoverageDE[1:16, ], withVaccDocument*MMR2+(1-withVaccDocument)*MMR2*0.5)
+
+## Pessimistic estimate of coverage with at least 1 vacc - assume those w/o card are unvacc
+X1pess=with(MMRcoverageDE[1:16, ], withVaccDocument*MMR1+(1-withVaccDocument)*MMR1*0)
+## Pessimistic estimate of coverage with at least 2 vacc - assume those w/o card are unvacc
+X2pess=with(MMRcoverageDE[1:16, ], withVaccDocument*MMR2+(1-withVaccDocument)*MMR2*0)
+
+## Optimistic estimate of coverage with at least 1 vacc - assume those w/o card have same coverage
+X1opt=with(MMRcoverageDE[1:16, ], withVaccDocument*MMR1+(1-withVaccDocument)*MMR1*1)
+## Optimistic estimate of coverage with at least 2 vacc - assume those w/o card have same coverage
+X2opt=with(MMRcoverageDE[1:16, ], withVaccDocument*MMR2+(1-withVaccDocument)*MMR2*1)
+
+
+##---------------------------------------##
+#### Observed Measles cases in Germany ####
+##---------------------------------------##
+## load data with observed data from surveillance package
+data("measlesDE")
+
+# get state names and abbreviations
+state_names=as.vector(colnames(observed(measlesDE)))
+
+snames=c('BW', 'BY', 'BE', 'BB', 'HB', 'HH', 'HE', 'MV', 'NI', 'NW', 'RP', 'SL', 'SN', 'ST', 'SH', 'TH' )
+
+state_labs=paste0(state_names, ' (', snames, ')')
+
+## in measlesDE, only population fraction is provided
+## to get population numbers, we assume the total population
+## is equal to 82,314,906 
+pop.frac=population(measlesDE)[1, ]
+
+pop.tot=as.vector(population(measlesDE)[1, ])*82314906
+
+pop=pop.tot
+
+
+## data in measlesDE is weekly data, but we are interested in bi-weekly counts, 
+## so we have to combine weeks for bi-weekly data
+Y=matrix(NA, nrow=78, ncol=16)
+for(t in 1:78){
+        Y[t, ] = colSums(observed(measlesDE)[(t*2-1):(t*2), ])
+}
+        
+
+#### Set up constants for number of bi-weeks, and seasonal components 
+Nwks3=26*3 # total number of bi-weeks (3-years worth of data)
+wk3=1:Nwks3 # enumerate bi-weeks
+sin3=sin((2*pi*(wk3)/26)) 
+cos3=cos((2*pi*(wk3)/26))
+
+measlesdat=list(I=16, Ts=78, Nobs=16*78, sin1=sin3, cos1=cos3,
+                y=t(Y), logNi=log(pop),
+                X=X1, N=sum(pop))
+
+
+##------------------------------------##
+#### Get map of Germany for mapping ####
+##------------------------------------##
+## downloaded from https://gadm.org/download_country_v3.html on 2018-11-15
+
+de=readRDS('gadm36_DEU_1_sp.RDS')
+
+state_cols=colorRampPalette(brewer.pal(11, "Spectral"))(16) 
+```
+
+# Introduction and notes
+- This file contains figures and analyses presented in ``Ecological inference for infectious disease data, with application to vaccination strategies", along with additional analyses that are not discussed in detail in the primary manuscript. 
+- There are three MCMC's run through Stan in this analysis, each may take approximately 30 minutes to compile. 
+
+
+
+
+```{r stan_mods, echo=F}
+
+mod_ENre='
+data{
+int<lower=1> I;          // number of areas
+int<lower=1> Ts;         // number of times
+int<lower=1> Nobs;    // number of total observations
+int y[I, Ts] ;  // IxTs matrix of observations
+real logNi[I];          // log population proportions 
+vector[I] X;            // vector of Xi vacc cover
+vector[Ts] sin1;           // vector of sin
+vector[Ts] cos1;           // vector of cos
+vector[2] a; //vector of parameters for the beta prior on phi
+}
+parameters{
+real alpha_ar;  // AR component - intercept
+real alpha_en;  // EN component - intercept
+real gamma;     // sin component
+real delta;     // cosine component 
+real<lower=0, upper=1> phi;  // vaccine effect
+vector[I] re_en; // EN random effects
+vector[I] re_ar; // AR random effects
+real<lower=0> sigma_ar; 
+real<lower=0> sigma_en; 
+}
+model{
+for(i in 1:I){
+re_ar[i]~normal(0, sigma_ar);
+re_en[i]~normal(0, sigma_en);
+for(t in 2:Ts){
+real muit;
+muit = exp(alpha_ar+re_ar[i])*y[i, t-1] + exp(logNi[i] + alpha_en + re_en[i] + gamma*sin1[t] + delta*cos1[t]);
+y[i, t] ~ poisson((1-phi*X[i])*muit);
+}
+}
+
+//priors
+alpha_ar ~ normal(0, 5);
+alpha_en ~ normal(0, 5);
+gamma ~ normal(0, 10);
+delta ~ normal(0, 10);
+phi ~ beta(a[1], a[2]);
+
+}
+generated quantities{
+vector[Nobs-I] log_lik;
+vector[I] ar;
+vector[I] en;
+vector[I] r; 
+for(i in 1:I){
+r[i] = exp(alpha_ar + re_ar[i])*(1-phi*X[i]); 
+ar[i] = exp(alpha_ar + re_ar[i]);
+en[i] = exp(alpha_en + re_en[i]);
+for(t in 2:Ts){
+real muit;
+muit=exp(alpha_ar + re_ar[i])*y[i, t-1] + exp(logNi[i] + alpha_en + re_en[i] + gamma*sin1[t] + delta*cos1[t]);
+log_lik[(i-1)*(Ts-1)+t-1 ] = poisson_lpmf(y[i, t] | (1-phi*X[i])*muit);
+}
+}
+}
+'
+
+### fixed effects model - to the MLE 
+mod_fe='
+data{
+int<lower=1> I;          // number of areas
+int<lower=1> Ts;         // number of times
+int<lower=1> Nobs;    // number of total observations
+int y[I, Ts] ;  // IxTs matrix of observations
+real logNi[I];          // log population sizes
+vector[I] X;            // vector of Xi vacc cover
+vector[Ts] sin1;           // vector of sin
+vector[Ts] cos1;           // vector of cos
+vector[2] a; //vector of parameters for the beta prior on phi
+}
+parameters{
+real alpha_ar;  // AR component - intercept
+real alpha_en;  // EN component - intercept
+real gamma;     // sin component
+real delta;     // cosine component 
+real<lower=0, upper=1> phi;  // vaccine effect
+}
+model{
+for(i in 1:I){
+for(t in 2:Ts){
+real muit;
+muit = exp(alpha_ar)*y[i, t-1] + exp(logNi[i] + alpha_en + gamma*sin1[t] + delta*cos1[t]);
+y[i, t] ~ poisson((1-phi*X[i])*muit);
+}
+}
+
+//priors
+alpha_ar ~ normal(0, 5);
+alpha_en ~ normal(0, 5);
+gamma ~ normal(0, 10);
+delta ~ normal(0, 10);
+phi ~ beta(a[1], a[2]);
+
+}
+generated quantities{
+vector[Nobs-I] log_lik;
+vector[I] ri; 
+for(i in 1:I){
+ri[i] = exp(alpha_ar)*(1-phi*X[i]); 
+for(t in 2:Ts){
+real muit;
+muit=exp(alpha_ar)*y[i, t-1] + exp(logNi[i] + alpha_en + gamma*sin1[t] + delta*cos1[t]);
+log_lik[(i-1)*(Ts-1)+t-1 ] = poisson_lpmf(y[i, t] | (1-phi*X[i])*muit);
+}
+}
+}
+'
+```
+
+
+# Descriptive tables and figures
+## Measles cases and estimated vaccination coverage
+Number of measles cases and estimated vaccination coverage for the 16 German states from 2005-2007. MMR1 (MMR2) is the estimated vaccination coverage for at least 1 (2) MMR vaccine, estimated from the school entry examinations. Note this partially reproduces Table 1 from Herzog et al 2011.
+```{r descrip_tab, results='markup'}
+
+data.frame(State = paste0(state_names, ' (', snames, ')'), 
+                   Population = format(pop, big.mark = ','), 
+                   Total.Cases = format(colSums(Y), big.mark = ',', digits=1),
+                   MMR1 = paste0(format(100*X1, digits=3), '%'),
+                   MMR2 = paste0(format(100*X2, digits=3), '%')
+)
+
+
+```
+
+## Summary figures
+
+```{r epicurve, fig.height=4.5, fig.width=6.5}
+par(mar=c(2, 2.5, 1, 2.5)+0.25, oma=c(1.5, 1.5, 0.5, 1.5))
+rng=range(colSums(measlesdat$y))
+if(rng[2]==0){rng[2]=1}
+if(rng[2]==1){rng[2]=1.25}
+plot(colSums(measlesdat$y), type='o', lty=1, pch=16, ylim=c(0, rng[2]*1.2), ylab='', yaxt='n', xaxt='n', xlab='', bty='n')
+axis(1, at=seq(0, 78, by=26), labels=rep(NA, 4))
+axis(1, at=seq(13, 78, by=26), labels=c(2005, 2006, 2007), tick=F, padj=0, line=-0.75)
+labs=NULL
+if(rng[2]<7){labs=0:rng[2]}
+if(rng[2]>=7 & rng[2]<11 ){labs=seq(0, 10, l=6)}
+if(rng[2]>=11 & rng[2]<16){labs=seq(0, 15, by=5)}
+if(rng[2]>=16 & rng[2]<21){labs=seq(0, 20, l=5)}
+if(rng[2]>=21 & rng[2]<41){labs=seq(0, 40, l=5)}
+if(rng[2]>=41 & rng[2]<65){labs=seq(0, 60, l=5)}
+if(rng[2]>=65){labs=seq(0, 400, l=9)}
+axis(2, at=labs, las=1, col='#000000', col.ticks = '#000000', col.axis='#000000')
+axis(4, at=labs, labels=c(round((labs/sum(pop))*1e5, 2)), cex.axis=1, tick=T, las=1, tck=-0.05)
+mtext(text='N cases per 100,000', side=4, line=0, outer=T)
+mtext(text='Time (bi-weeks)', side=1, line=0, outer=T)
+mtext(text='Number of cases', side=2, line=0, outer=T)
+
+```
+
+```{r summap, fig.height=6.5, fig.width=6.5}
+par(mar=c(0, 1, 0, 0))
+brks=c(seq(0, 1, l=9), 2:5, 10, 12)
+plotclr=c("#FFFFFF", colorRampPalette(brewer.pal(9, "PuRd")[-1])(length(brks)-1) )
+plotvar=1e5*rowSums(measlesdat$y)/pop
+colornum=findInterval(plotvar, brks, all.inside=T)
+colcode=plotclr[colornum]
+plot(de, col=colcode) # , main='Total cases per 100,000'
+leglabs=brks
+legend("left", legend=sprintf('%g', leglabs), fill=plotclr, bty="n", cex=1, ncol=1)
+
+```
+
+
+
+## Maps of the estimated proportion of individuals with at least one and two MMR vaccines.
+```{r coverage_maps, fig.height=6.5, fig.width=6.5}
+par(mar=c(0, 1, 0, 0))
+brks=seq(from=0.88, to=0.95, l=13)
+plotclr=colorRampPalette(brewer.pal(9, "YlOrRd"))(13) 
+plotvar=X1
+colornum=findInterval(plotvar, brks, all.inside=T)
+colcode=plotclr[colornum]
+plot(de, col=colcode)
+leglabs=100*brks
+legend("left", legend=sprintf('%2.1f%%', leglabs), fill=plotclr, bty="n", cex=1, ncol=1)
+
+
+brks=seq(from=0.70, to=0.88, l=13)
+plotclr=rev(colorRampPalette(brewer.pal(9, "YlGnBu"))(13) )
+plotvar=X2
+colornum=findInterval(plotvar, brks, all.inside=T)
+colcode=plotclr[colornum]
+plot(de, col=colcode)
+leglabs=100*brks
+legend("left", legend=sprintf('%2.1f%%', leglabs), fill=plotclr, bty="n", cex=1, ncol=1)
+
+```
+
+## Observed bi-weekly incidence of reported cases:
+```{r observed_data, fig.height=6.5, fig.width=8.5}
+
+par(mfrow=c(4, 4), mar=c(2, 2.5, 1, 2.5)+0.25, oma=c(1.5, 1.5, 0.5, 1.5))
+for(i in 1:16){
+  rng=range(measlesdat$y[i, ])
+  if(rng[2]==0){rng[2]=1}
+  if(rng[2]==1){rng[2]=1.25}
+  plot(measlesdat$y[i, ], type='o', lty=1, pch=16, ylim=c(0, rng[2]*1.2), ylab='', yaxt='n', xaxt='n', xlab='', bty='n')
+  axis(1, at=seq(0, 78, by=26), labels=rep(NA, 4))
+  axis(1, at=seq(13, 78, by=26), labels=c(2005, 2006, 2007), tick=F, padj=0, line=-0.75)
+  labs=NULL
+  if(rng[2]<7){labs=0:rng[2]}
+  if(rng[2]>=7 & rng[2]<11 ){labs=seq(0, 10, l=6)}
+  if(rng[2]>=11 & rng[2]<16){labs=seq(0, 15, by=5)}
+  if(rng[2]>=16 & rng[2]<21){labs=seq(0, 20, l=5)}
+  if(rng[2]>=21 & rng[2]<41){labs=seq(0, 40, l=5)}
+  if(rng[2]>=41 & rng[2]<65){labs=seq(0, 60, l=5)}
+  if(rng[2]>=65){labs=seq(0, 300, l=5)}
+  axis(2, at=labs, las=1, col='#000000', col.ticks = '#000000', col.axis='#000000')
+  axis(4, at=labs, labels=c(round((labs/pop[i])*1e5, 2)), cex.axis=1, tick=T, las=1, tck=-0.05)
+  mtext(at=75, bquote(paste(x[i], '=', .(round(100*X1[i], 1)) ) ), cex=0.75, line=-1.25, adj=1)
+  mtext(state_labs[i], cex=0.75)
+  
+}
+
+mtext(text='N cases per 100,000', side=4, line=0, outer=T)
+mtext(text='Time (bi-weeks)', side=1, line=0, outer=T)
+mtext(text='Number of cases', side=2, line=0, outer=T)
+
+
+```
+
+
+
+# Fit hierarchical model in Stan
+## Get prior
+```{r phi_prior, echo=T, results='markup'}
+priorch <- function(x,q1,q2,p1,p2){
+  (p1-pbeta(q1,x[1],x[2]))^2 + (p2-pbeta(q2,x[1],x[2]))^2 }
+# p1 and p2 define the upper and lower levels of the interval
+p1 <- 0.05; p2 <- 0.95 
+# q1 and q2 define the bounds of the interval
+q1 <- 0.6; q2 <- 0.95 
+## together, we interpret these values to say:
+## we want 90% (p2-p1) of the mass to be between q1 and q2
+
+## solve and get the parameters for a beta distribution 90% of mass between 0.6 and 0.95
+opt <- optim(par=c(1,1),fn=priorch,q1=q1,q2=q2,p1=p1,p2=p2)
+opt$par
+
+```
+
+
+
+## Fit model and assess converged
+```{r runstan, echo=T, results='markup'}
+
+
+measlesdat=list(I=16, # number of areas
+                Ts=78, # number of time points
+                Nobs=16*78, # total number of observations
+                sin1=sin3, cos1=cos3, # inputs for seasonal terms
+                y=t(Y), # observed cases dim I x Ts
+                logNi=log(pop/sum(pop)), # log pop fraction
+                X=X1, # vaccination coverage
+                N=sum(pop), # total pop
+                a=c(10, 2.5) # parameters specifying prior on phi
+                ) 
+
+
+pmt=proc.time()
+fit <- stan(
+        model_code = mod_ENre,
+        chains=4, iter=4e3, 
+        control=list(adapt_delta=0.99, max_treedepth = 15),
+        seed=47,
+        data = measlesdat)
+(proc.time()-pmt)/60
+
+print(fit, pars=c("alpha_ar", "phi",  'alpha_en', 'gamma', 'delta', 'sigma_ar', 'sigma_en', "lp__"), probs=c(.025,.5,.975)) # 
+
+print(fit, pars=c("alpha_ar", 're_ar', 'sigma_ar', "lp__"), probs=c(.025,.5,.975)) # 
+
+
+print(fit, pars=c("alpha_en", 're_en', 'sigma_en', "lp__"), probs=c(.025,.5,.975)) # 
+
+
+traceplot(fit, pars=c("alpha_ar", "phi",  'alpha_en', 'gamma', 'delta','sigma_ar', 'sigma_en', "lp__")) #
+
+pairs(fit, pars=c("alpha_ar", "phi",  'alpha_en', 'gamma', 'delta', 'sigma_ar', 'sigma_en', "lp__")) #
+
+
+
+```
+
+## Parameter estimates
+```{r stan_ests, results='markup'}
+## extract posterior estimates for primary parameters
+tmp=extract(fit, pars=c("alpha_ar", "phi",  'alpha_en', 'gamma', 'delta','sigma_ar', 'sigma_en'))
+measfit_ests=sapply(tmp, median)
+measfit_ci=t(sapply(tmp, function(x){quantile(x, c(0.5, 0.025, 0.975))}))
+measfit_ci=rbind(measfit_ci, R0=exp(measfit_ci['alpha_ar', ]))
+
+round(measfit_ci, digits=3)
+
+```
+
+
+
+
+## Examine model fits
+```{r fitted_plot, fig.height=6.5, fig.width=8.5}
+
+
+## estimate the area-specific R0 
+tmp=extract(fit, pars=c('ar'))$ar
+ar_ests=t(apply(tmp, 2, function(x){quantile(x, c(0.5, 0.025, 0.975))}))
+
+## estimate R (effective reproductive number) for each area ##
+tmp=extract(fit, pars=c('r'))$r #(1-X1*measfit_ests['phi'])*ar_ests
+measfit_ri=t(apply(tmp, 2, function(x){quantile(x, c(0.5, 0.025, 0.975))}))
+
+#
+tmp=extract(fit, pars=c('re_en'))$re_en
+en_ests=t(apply(tmp, 2, function(x){quantile(x, c(0.5, 0.025, 0.975))}))
+
+measfits=matrix(NA, nrow=16, ncol=Nwks3)
+measfits[, 1]=measlesdat$y[, 1]
+for(t in 2:Nwks3){
+  measfits[, t]=(1-X1*measfit_ests['phi'])*( ar_ests[, 1]*measlesdat$y[, t-1] + (pop/sum(pop))*exp(measfit_ests['alpha_en'] + en_ests[, 1] + measfit_ests['gamma']*sin3[t] + measfit_ests['delta']*cos3[t]))
+}
+
+# 
+# par(mfrow=c(4, 4), mar=c(2, 2.5, 1, 0.5)+0.25, oma=c(1.5, 1.5, 0.5, 1.5))
+# for(i in 1:16){
+#   rng=range(measlesdat$y[i, ])
+#   if(rng[2]==0){rng[2]=1}
+#   if(rng[2]==1){rng[2]=1.25}
+#   plot(measlesdat$y[i, ], type='o', lty=1, pch=16, ylim=c(0, rng[2]*1.1), ylab='', yaxt='n', xaxt='n', xlab='', bty='n')
+#   axis(1, at=seq(0, 78, by=26), labels=rep(NA, 4))
+#   axis(1, at=seq(13, 78, by=26), labels=c(2005, 2006, 2007), tick=F, padj=0, line=-0.75)
+#   labs=NULL
+#   if(rng[2]<7){labs=0:rng[2]}
+#   if(rng[2]>=7 & rng[2]<11 ){labs=seq(0, 10, l=6)}
+#   if(rng[2]>=11 & rng[2]<16){labs=seq(0, 15, by=5)}
+#   if(rng[2]>=16 & rng[2]<21){labs=seq(0, 20, l=5)}
+#   if(rng[2]>=21 & rng[2]<41){labs=seq(0, 40, l=5)}
+#   if(rng[2]>=41 & rng[2]<65){labs=seq(0, 60, l=5)}
+#   if(rng[2]>=65){labs=seq(0, 300, l=5)}
+#   axis(2, at=labs, las=1, col='#000000', col.ticks = '#000000', col.axis='#000000')
+#   lines(measfits[i, ], lty=1, col='#ff0000')
+#   mtext(at=75, bquote(paste(hat(R), '=', .(round(measfit_ri[i, 1], 3)) ) ), cex=0.75, line=-1.25, adj=1)
+#   mtext(state_names[i], cex=0.75)
+#   
+# }
+# 
+# mtext(text='Time (bi-weeks)', side=1, line=0, outer=T)
+# mtext(text='Number of cases', side=2, line=0, outer=T)
+
+
+par(mfrow=c(4, 4), mar=c(2, 2.5, 2, 2.5)+0.25, oma=c(1.5, 1.5, 0.5, 1.5))
+for(i in 1:16){
+  rng=range(measlesdat$y[i, ])
+  if(rng[2]==0){rng[2]=1}
+  # if(rng[2]==1){rng[2]=}
+  plot(measlesdat$y[i, ], type='o', lty=1, pch=16, ylim=c(0, rng[2]), ylab='', yaxt='n', xaxt='n', xlab='', bty='n')
+  axis(1, at=seq(0, 78, by=26), labels=rep(NA, 4))
+  axis(1, at=seq(13, 78, by=26), labels=c(2005, 2006, 2007), tick=F, padj=0, line=-0.75)
+  labs=NULL
+  if(rng[2]<7){labs=0:rng[2]}
+  if(rng[2]>=7 & rng[2]<11 ){labs=seq(0, 10, l=6)}
+  if(rng[2]>=11 & rng[2]<16){labs=seq(0, 15, by=5)}
+  if(rng[2]>=16 & rng[2]<21){labs=seq(0, 20, l=5)}
+  if(rng[2]>=21 & rng[2]<41){labs=seq(0, 40, l=5)}
+  if(rng[2]>=41 & rng[2]<65){labs=seq(0, 60, l=5)}
+  if(rng[2]>=65){labs=seq(0, 300, l=5)}
+  axis(2, at=labs, las=1, col='#000000', col.ticks = '#000000', col.axis='#000000')
+  axis(4, at=labs, labels=c(round((labs/pop[i])*1e5, 2)), cex.axis=1, tick=T, las=1, tck=-0.05)
+  lines(measfits[i, ], lty=1, col='#ff0000')
+  mtext(at=75, bquote(paste(hat(R), '=', .(round(measfit_ri[i, 1], 2)) ) ), cex=0.7, line=-0.15, adj=1)
+  mtext(at=3, bquote(paste(x[i], '=', .(format(100*X1[i], digits=3)), '%') ), cex=0.7, line=-0.25, adj=0)
+  mtext(state_labs[i], cex=0.75, line=1)
+  
+}
+
+mtext(text='Time (bi-weeks)', side=1, line=0, outer=T)
+mtext(text='Number of cases', side=2, line=0, outer=T)
+mtext(text='N cases per 100,000', side=4, line=0, outer=T)
+
+
+```
+
+
+
+```{r eco_mod_ests_r, fig.height=4.5, fig.width=8.5}
+
+tmp=extract(fit, pars=c('r'))$r #(1-X1*measfit_ests['phi'])*ar_ests
+measfit_ri=t(apply(tmp, 2, function(x){quantile(x, c(0.5, 0.025, 0.975))}))
+
+tmp=extract(fit, pars=c('en'))$en 
+measfit_en_intercept=t(apply(tmp, 2, function(x){quantile(x, c(0.5, 0.025, 0.975))}))*exp(measlesdat$logNi)
+
+
+# par(mar=c(4, 4, 1, 0)+0.1)
+# plot(x=1:16+0.15, y=measfit_ri[, 1], pch=16, las=1, xaxt='n', xlab='State', ylab='Est. AR component', ylim=c(0.015, max(measfit_ri[, 3])), xlim=c(0.75, 16.25), col='#0000ff')
+# abline(h=1, lty=3, col='#00000075')
+# axis(1, at=1:16, labels=state_labs[1:16], cex.axis=0.75, las=2)
+# segments(y0=measfit_ri[, 2], y1=measfit_ri[, 3], x0=1:16+0.15, x1=1:16+0.15, col='#0000ff')
+# legend('topleft', legend=c('Ecological vaccine model'), pch=16, col=c('#0000ff'), bty='n', lty=1)
+
+
+state_names2<-state_names
+state_names2[8] <- "Mecklenburg-\nWestern Pomerania"
+state_names2[1] <- "Baden-\nWuerttemberg"
+state_names2[10] <- "North Rhine-\nWestphalia"
+# state_names2[11] <- "Rhineland-\nPalatinate"
+
+par(mar=c(7.5, 4, 0.5, 0.5)+0.1)
+plot(x=1:16, y=measfit_ri[, 1], pch=16, las=1, xaxt='n', xlab='', ylab='Est effective reproductive number', ylim=c(0.015, max(measfit_ri[, 3])), xlim=c(0.75, 16.25), col='#0000ff')
+abline(h=1, lty=3, col='#00000075')
+axis(1, at=1:16, labels=rep(NA, 16), cex.axis=0.75, las=2)
+segments(y0=measfit_ri[, 2], y1=measfit_ri[, 3], x0=1:16, x1=1:16, col='#0000ff')
+text(x=1:16, y=par("usr")[3]-0.1, srt = 60, adj= 1, xpd = TRUE, labels=state_names2[1:16], cex=0.95)
+
+
+par(mar=c(7.5, 4, 0.5, 0.5)+0.1)
+plot(x=1:16, y=measfit_en_intercept[, 1], pch=16, las=1, xaxt='n', xlab='', ylab='Est endemic intercept', ylim=c(0.015, max(measfit_en_intercept[, 3])), xlim=c(0.75, 16.25), col='#0000ff')
+abline(h=1, lty=3, col='#00000075')
+axis(1, at=1:16, labels=rep(NA, 16), cex.axis=0.75, las=2)
+segments(y0=measfit_en_intercept[, 2], y1=measfit_en_intercept[, 3], x0=1:16, x1=1:16, col='#0000ff')
+text(x=1:16, y=par("usr")[3]-0.5, srt = 60, adj= 1, xpd = TRUE, labels=state_names2[1:16], cex=0.95)
+
+
+```
+
+
+```{r eco_mod_ests_stan, eval=F}
+
+par(mar=c(4, 8, 0.5, 0.5)+0.1)
+plot(y=1:16, x=measfit_ri[, 1], pch=16, las=1, yaxt='n', ylab='', xlab='Est. AR component', xlim=c(0.015, max(measfit_ri[, 3])), ylim=c(0.75, 16.25), col='#0000ff')
+abline(v=1, lty=3, col='#00000075')
+axis(2, at=1:16, labels=rep(NA, 16), cex.axis=0.75, las=2)
+segments(x0=measfit_ri[, 2], x1=measfit_ri[, 3], y0=1:16, y1=1:16, col='#0000ff')
+text(y=1:16, x=par("usr")[1]-0.1, srt = 0, adj= 1, xpd = TRUE, labels=state_names2[1:16], cex=0.95)
+
+
+```
+
+
+## Estimates of random effects
+```{r re_ests}
+
+res=extract(fit, pars=c('re_ar'))
+ar_ests=apply(res$re_ar, 2, median)
+
+brks=seq(from=-1, to=1, l=16)
+plotclr=colorRampPalette(brewer.pal(9, "BuPu"))(16)
+plotvar=ar_ests
+colornum=findInterval(plotvar, brks, all.inside=T)
+colcode=plotclr[colornum]
+plot(de, col=colcode)
+legend("left", legend=sprintf('%2.2f', brks), fill=plotclr, bty="n", cex=1, ncol=1)
+
+
+res=extract(fit, pars=c('re_en'))
+en_ests=apply(res$re_en, 2, median)
+
+brks=seq(from=-1, to=1, l=16)
+plotclr=colorRampPalette(brewer.pal(9, "BuPu"))(16)
+plotvar=en_ests
+colornum=findInterval(plotvar, brks, all.inside=T)
+colcode=plotclr[colornum]
+plot(de, col=colcode)
+legend("left", legend=sprintf('%2.2f', brks), fill=plotclr, bty="n", cex=1, ncol=1)
+
+
+plot(ar_ests~en_ests, xlab='Est. endemic random effect', ylab='Est. autoregressive random effect', xlim=c(-0.8, 0.8), ylim=c(-0.8, 0.8))
+abline(0, 1)
+
+```
+
+## Examine posterior distributions
+```{r phi_posterior, fig.height=4, fig.width=5}
+phis=extract(fit, pars=c('phi'))
+
+hist(x=phis$phi, xlim=c(0, 1), freq=F, col='#00000050', breaks=70, xlab=expression(hat(phi)), main='')
+curve(dbeta(x, 10, 2.5), from=0, to=1, ylab='', add=T, col='red')
+legend('topleft', legend=c('Prior'), col='red', lty=1, bty='n')
+```
+
+## Plot Pearson residuals
+```{r plot_resids}
+# rit=(Y-Yhat)/sqrt(Yhat)
+rit=matrix(NA, nrow=16, ncol=78)
+for(i in 1:16){
+        rit[i, ]=(measlesdat$y[i, ]-measfits[i, ])/sqrt(measfits[i, ])
+}
+
+
+par(mfrow=c(4, 4), mar=c(2, 2.5, 1, 0.5)+0.25, oma=c(1.5, 1.5, 0.5, 1.5))
+for(i in 1:16){
+        rng=ceiling(max(abs(range(rit[i, ], na.rm=T))))
+        
+        plot(rit[i, ], type='p', lty=1, pch=16, ylab='', xaxt='n', xlab='', col='#00000075', ylim=c(-rng, rng))
+        abline(h=0, lty=2)
+        axis(1, at=seq(0, 78, by=26), labels=rep(NA, 4))
+        axis(1, at=seq(13, 78, by=26), labels=c(2005, 2006, 2007), tick=F, padj=0, line=-0.75)
+        
+        lines(lowess(rit[i, -1], iter=0), lty=1, col='#ff0000')
+        mtext(state_names[i], cex=0.75)
+        
+}
+mtext(text='Time (bi-weeks)', side=1, line=0, outer=T)
+mtext(text='Pearson residuals', side=2, line=0, outer=T)
+
+
+```
+
+
+# Additional analyses
+## Comparison of MLE vs Bayesian analysis
+### MLE estimates
+```{r define_mle_function, echo=T}
+loglik_eco=function(param, y, xi, n){
+        v=expit(param[2])
+        l=0
+        nwks=dim(y)[2]
+        ni=dim(y)[1]
+        for(i in 1:ni){
+                for(t in 2:nwks){
+                        lam=(exp(param[1])*y[i, t-1] + (n[i]/sum(n))*exp(param[3] + param[4]*sin(2*pi*t/26) + param[5]*cos(2*pi*t/26))  )
+                        l=l-dpois(y[i, t], lambda=(1-v*xi[i])*lam, log=T)
+                }
+        }
+        return(l)
+}
+
+
+
+
+```
+
+```{r est_mle, results='markdown'}
+ecomod=optim(par=c(1.5, 0, 0.5, 0.05, -0.5), fn=loglik_eco, y=measlesdat$y, xi=measlesdat$X, n=exp(measlesdat$logNi)*measlesdat$N, hessian=T, method='BFGS', control=list(reltol=1e-5))
+
+
+se=sqrt(diag(solve(ecomod$hessian)))
+
+data.frame(parameter=c('alpha_ar', 'phi', 'alpha_en', 'gamma', 'delta'), 
+           Est=c(ecomod$par[1], expit(ecomod$par[2]), ecomod$par[3:5]), 
+           SE=c(se[1], expit(se[2]), se[3:5]))
+```
+
+
+### Estimates from fixed effects Stan model
+
+```{r fixed_effects_stan_mod, echo=T, results='markdown'}
+
+measlesdat2=measlesdat
+measlesdat2$a=c(1, 1) # put a flat prior on phi
+
+pmt=proc.time()
+fit_fe <- stan(
+        model_code = mod_fe,
+        chains=4, iter=4e3, # warmup = 1e3, # save_dso = T,  # warmup=7e3, # refresh=F, #  #
+        control=list(adapt_delta=0.99, max_treedepth = 15),
+        data = measlesdat2)
+(proc.time()-pmt)/60
+
+print(fit_fe, pars=c("alpha_ar", "phi",  'alpha_en', 'gamma', 'delta'), probs=c(.025,.5,.975), digits_summary = 3) # 
+
+```
+
+
+
+
+## Sensitivity analysis - measles analysis with non-informative priors
+
+```{r runstan_sens, echo=T, results='markup'}
+
+measlesdat=list(I=16, # number of areas
+                Ts=78, # number of time points
+                Nobs=16*78, # total number of observations
+                sin1=sin3, cos1=cos3, # inputs for seasonal terms
+                y=t(Y), # observed cases dim I x Ts
+                logNi=log(pop/sum(pop)), # log pop fraction
+                X=X1, # vaccination coverage
+                N=sum(pop), # total pop
+                a=c(1, 1) # parameters specifying prior on phi
+                ) 
+
+
+pmt=proc.time()
+fit_flat <- stan(
+        model_code = mod_ENre,
+        chains=4, iter=4e3, # warmup = 1e3, # save_dso = T,  # warmup=7e3, # refresh=F, #  #
+        control=list(adapt_delta=0.99, max_treedepth = 15),
+        data = measlesdat)
+(proc.time()-pmt)/60
+
+print(fit_flat, pars=c("alpha_ar", "phi",  'alpha_en', 'gamma', 'delta', 'sigma_ar', 'sigma_en', "lp__"), probs=c(.025,.5,.975)) # 
+
+print(fit_flat, pars=c("alpha_ar", 're_ar', 'sigma_ar', "lp__"), probs=c(.025,.5,.975)) # 
+
+
+print(fit_flat, pars=c("alpha_en", 're_en', 'sigma_en', "lp__"), probs=c(.025,.5,.975)) # 
+
+
+traceplot(fit_flat, pars=c("alpha_ar", "phi",  'alpha_en', 'gamma', 'delta','sigma_ar', 'sigma_en', "lp__")) #
+
+pairs(fit_flat, pars=c("alpha_ar", "phi",  'alpha_en', 'gamma', 'delta', 'sigma_ar', 'sigma_en', "lp__")) #
+
+
+
+```
+
+### Examine model fits
+```{r fitted_plot_sens}
+
+## extract posterior estimates for primary parameters
+tmp=extract(fit_flat, pars=c("alpha_ar", "phi",  'alpha_en', 'gamma', 'delta','sigma_ar', 'sigma_en'))
+measfit_ests=sapply(tmp, median)
+measfit_ci=t(sapply(tmp, function(x){quantile(x, c(0.5, 0.025, 0.975))}))
+measfit_ci=rbind(measfit_ci, R0=exp(measfit_ci['alpha_ar', ]))
+
+kable(measfit_ci, digits=3)
+
+
+## estimate the effective reproductive number by area
+measfit_ri=(1-X1*measfit_ests['phi'])*exp(measfit_ests['alpha_ar'])
+
+
+## estimate the area-specific effect
+tmp=extract(fit_flat, pars=c('ar'))
+ar_ests=apply(tmp$ar, 2, median)
+
+## estimate R (effective reproductive number) for each area ##
+measfit_ri=(1-X1*measfit_ests['phi'])*ar_ests
+
+#
+en_res=extract(fit_flat, pars=c('re_en'))
+en_ests=apply(en_res$re_en, 2, median)
+
+measfits=matrix(NA, nrow=16, ncol=Nwks3)
+measfits[, 1]=measlesdat$y[, 1]
+for(t in 2:Nwks3){
+  measfits[, t]=(1-X1*measfit_ests['phi'])*( ar_ests*measlesdat$y[, t-1] + (pop/sum(pop))*exp(measfit_ests['alpha_en'] + en_ests + measfit_ests['gamma']*sin3[t] + measfit_ests['delta']*cos3[t]))
+}
+
+
+par(mfrow=c(4, 4), mar=c(2, 2.5, 1, 0.5)+0.25, oma=c(1.5, 1.5, 0.5, 1.5))
+for(i in 1:16){
+  rng=range(measlesdat$y[i, ])
+  if(rng[2]==0){rng[2]=1}
+  if(rng[2]==1){rng[2]=1.25}
+  plot(measlesdat$y[i, ], type='o', lty=1, pch=16, ylim=c(0, rng[2]*1.1), ylab='', yaxt='n', xaxt='n', xlab='', bty='n')
+  axis(1, at=seq(0, 78, by=26), labels=rep(NA, 4))
+  axis(1, at=seq(13, 78, by=26), labels=c(2005, 2006, 2007), tick=F, padj=0, line=-0.75)
+  labs=NULL
+  if(rng[2]<7){labs=0:rng[2]}
+  if(rng[2]>=7 & rng[2]<11 ){labs=seq(0, 10, l=6)}
+  if(rng[2]>=11 & rng[2]<16){labs=seq(0, 15, by=5)}
+  if(rng[2]>=16 & rng[2]<21){labs=seq(0, 20, l=5)}
+  if(rng[2]>=21 & rng[2]<41){labs=seq(0, 40, l=5)}
+  if(rng[2]>=41 & rng[2]<65){labs=seq(0, 60, l=5)}
+  if(rng[2]>=65){labs=seq(0, 300, l=5)}
+  axis(2, at=labs, las=1, col='#000000', col.ticks = '#000000', col.axis='#000000')
+  lines(measfits[i, ], lty=1, col='#ff0000')
+  mtext(at=75, bquote(paste(hat(R), '=', .(round(measfit_ri[i], 3)) ) ), cex=0.5, line=-1.5, adj=1)
+  mtext(state_names[i], cex=0.75)
+  
+}
+
+mtext(text='Time (bi-weeks)', side=1, line=0, outer=T)
+mtext(text='Number of cases', side=2, line=0, outer=T)
+mtext(text='Fitted with non-informative prior', side=3, line=0, outer=T)
+
+```
+
+### Estimates of random effects
+```{r re_ests_sens}
+
+res=extract(fit_flat, pars=c('re_ar'))
+ar_ests=apply(res$re_ar, 2, median)
+
+brks=seq(from=-1, to=1, l=16)
+plotclr=colorRampPalette(brewer.pal(9, "BuPu"))(16)
+plotvar=ar_ests
+colornum=findInterval(plotvar, brks, all.inside=T)
+colcode=plotclr[colornum]
+plot(de, col=colcode, title='AR random effects\n non-informative prior')
+legend("left", legend=sprintf('%2.2f', brks), fill=plotclr, bty="n", cex=1, ncol=1)
+
+
+res=extract(fit_flat, pars=c('re_en'))
+en_ests=apply(res$re_en, 2, median)
+
+brks=seq(from=-1, to=1, l=16)
+plotclr=colorRampPalette(brewer.pal(9, "BuPu"))(16)
+plotvar=en_ests
+colornum=findInterval(plotvar, brks, all.inside=T)
+colcode=plotclr[colornum]
+plot(de, col=colcode)
+legend("left", legend=sprintf('%2.2f', brks), fill=plotclr, bty="n", cex=1, ncol=1)
+
+
+plot(ar_ests~en_ests, xlab='Est. endemic random effect', ylab='Est. autoregressive random effect', xlim=c(-0.8, 0.8), ylim=c(-0.8, 0.8))
+abline(0, 1)
+
+```
+
+### Examine posterior distributions
+```{r phi_posterior_sens, fig.height=4, fig.width=5}
+phis=extract(fit_flat, pars=c('phi'))
+
+hist(x=phis$phi, xlim=c(0, 1), freq=F, col='#00000050', breaks=70, xlab=expression(hat(phi)), main='Posterior with non-informative prior')
+curve(dbeta(x, measlesdat$a[1], measlesdat$a[2]), from=0, to=1, ylab='', add=T, col='red')
+legend('topleft', legend=c('Prior'), col='red', lty=1, bty='n')
+```
+
+# Stan Models
+Below, we print the code to define the Stan models fit in this document
+```{r print_stan, ref.label='stan_mods', eval=F, echo=T}
+
+```
+
