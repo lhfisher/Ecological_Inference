@@ -1,6 +1,33 @@
 Analysis of Measles data in Germany
 ================
-16 July, 2019
+17 July, 2019
+
+  - [Introduction and notes](#introduction-and-notes)
+  - [Descriptive tables and figures](#descriptive-tables-and-figures)
+      - [Measles cases and estimated vaccination
+        coverage](#measles-cases-and-estimated-vaccination-coverage)
+      - [Summary figures](#summary-figures)
+      - [Maps of the estimated proportion of individuals with at least
+        one and two MMR
+        vaccines.](#maps-of-the-estimated-proportion-of-individuals-with-at-least-one-and-two-mmr-vaccines.)
+      - [Observed bi-weekly incidence of reported
+        cases:](#observed-bi-weekly-incidence-of-reported-cases)
+  - [Fit hierarchical model in Stan](#fit-hierarchical-model-in-stan)
+      - [Get prior](#get-prior)
+      - [Fit model and assess
+        converged](#fit-model-and-assess-converged)
+      - [Parameter estimates](#parameter-estimates)
+      - [Examine model fits](#examine-model-fits)
+      - [Estimates of random effects](#estimates-of-random-effects)
+      - [Examine posterior
+        distributions](#examine-posterior-distributions)
+      - [Plot Pearson residuals](#plot-pearson-residuals)
+  - [Additional analyses](#additional-analyses)
+      - [Comparison of MLE vs Bayesian
+        analysis](#comparison-of-mle-vs-bayesian-analysis)
+      - [Sensitivity analysis - measles analysis with non-informative
+        priors](#sensitivity-analysis---measles-analysis-with-non-informative-priors)
+  - [Stan Models](#stan-models)
 
 # Introduction and notes
 
@@ -274,26 +301,9 @@ loglik_eco=function(param, y, xi, n){
 
 ### Estimates from fixed effects Stan model
 
-``` r
-measlesdat2=measlesdat
-measlesdat2$a=c(1, 1) # put a flat prior on phi
-
-pmt=proc.time()
-fit_fe <- stan(
-        model_code = mod_fe,
-        chains=4, iter=4e3, # warmup = 1e3, # save_dso = T,  # warmup=7e3, # refresh=F, #  #
-        control=list(adapt_delta=0.99, max_treedepth = 15),
-        data = measlesdat2)
-(proc.time()-pmt)/60
-```
-
 ``` 
       user     system    elapsed 
-0.42033333 0.02583333 8.41350000 
-```
-
-``` r
-print(fit_fe, pars=c("alpha_ar", "phi",  'alpha_en', 'gamma', 'delta'), probs=c(.025,.5,.975), digits_summary = 3) # 
+0.37416667 0.03283333 7.90400000 
 ```
 
     Inference for Stan model: 8a16ff8514700ac19fc4f3422c38a24a.
@@ -301,48 +311,22 @@ print(fit_fe, pars=c("alpha_ar", "phi",  'alpha_en', 'gamma', 'delta'), probs=c(
     post-warmup draws per chain=2000, total post-warmup draws=8000.
     
                mean se_mean    sd   2.5%    50% 97.5% n_eff  Rhat
-    alpha_ar  2.067   0.001 0.054  1.928  2.080 2.140  2297 1.001
-    phi       0.994   0.000 0.006  0.976  0.996 1.000  2085 1.001
-    alpha_en  4.121   0.002 0.084  3.927  4.128 4.264  2979 1.000
-    gamma     0.700   0.001 0.084  0.534  0.700 0.866  4364 1.001
-    delta    -0.073   0.001 0.080 -0.228 -0.074 0.091  4104 1.001
+    alpha_ar  2.068   0.001 0.054  1.931  2.080 2.140  2118 1.003
+    phi       0.994   0.000 0.006  0.977  0.996 1.000  1943 1.002
+    alpha_en  4.122   0.002 0.084  3.936  4.128 4.263  2607 1.001
+    gamma     0.701   0.001 0.083  0.541  0.700 0.864  4961 1.000
+    delta    -0.075   0.001 0.078 -0.228 -0.075 0.080  5278 1.000
     
-    Samples were drawn using NUTS(diag_e) at Tue Jul 16 10:09:18 2019.
+    Samples were drawn using NUTS(diag_e) at Wed Jul 17 14:52:55 2019.
     For each parameter, n_eff is a crude measure of effective sample size,
     and Rhat is the potential scale reduction factor on split chains (at 
     convergence, Rhat=1).
 
 ## Sensitivity analysis - measles analysis with non-informative priors
 
-``` r
-measlesdat=list(I=16, # number of areas
-                Ts=78, # number of time points
-                Nobs=16*78, # total number of observations
-                sin1=sin3, cos1=cos3, # inputs for seasonal terms
-                y=t(Y), # observed cases dim I x Ts
-                logNi=log(pop/sum(pop)), # log pop fraction
-                X=X1, # vaccination coverage
-                N=sum(pop), # total pop
-                a=c(1, 1) # parameters specifying prior on phi
-                ) 
-
-
-pmt=proc.time()
-fit_flat <- stan(
-        model_code = mod_ENre,
-        chains=4, iter=4e3, # warmup = 1e3, # save_dso = T,  # warmup=7e3, # refresh=F, #  #
-        control=list(adapt_delta=0.99, max_treedepth = 15),
-        data = measlesdat)
-(proc.time()-pmt)/60
-```
-
 ``` 
-       user      system     elapsed 
- 0.37366667  0.03566667 41.98533333 
-```
-
-``` r
-print(fit_flat, pars=c("alpha_ar", "phi",  'alpha_en', 'gamma', 'delta', 'sigma_ar', 'sigma_en', "lp__"), probs=c(.025,.5,.975)) # 
+      user     system    elapsed 
+ 0.4598333  0.0625000 37.9250000 
 ```
 
     Inference for Stan model: c4c1ff19f358c6c9ee8fb5649733aef4.
@@ -350,99 +334,81 @@ print(fit_flat, pars=c("alpha_ar", "phi",  'alpha_en', 'gamma', 'delta', 'sigma_
     post-warmup draws per chain=2000, total post-warmup draws=8000.
     
                 mean se_mean   sd    2.5%     50%   97.5% n_eff Rhat
-    alpha_ar    0.92    0.03 0.77   -0.90    1.18    1.83   739    1
-    phi         0.86    0.01 0.23    0.15    0.96    1.00  1043    1
-    alpha_en    3.54    0.02 0.73    1.79    3.82    4.33   876    1
-    gamma       0.71    0.00 0.08    0.55    0.71    0.87  7345    1
-    delta      -0.20    0.00 0.08   -0.35   -0.19   -0.03  6391    1
-    sigma_ar    0.73    0.01 0.38    0.25    0.65    1.66   727    1
-    sigma_en    0.52    0.01 0.19    0.23    0.50    0.96  1293    1
-    lp__     8521.09    0.23 6.47 8507.85 8521.21 8532.78   793    1
+    alpha_ar    0.97    0.03 0.76   -0.89    1.24    1.84   607 1.01
+    phi         0.87    0.01 0.22    0.17    0.97    1.00   902 1.01
+    alpha_en    3.59    0.02 0.69    1.85    3.85    4.32   789 1.01
+    gamma       0.71    0.00 0.08    0.55    0.71    0.87  6502 1.00
+    delta      -0.20    0.00 0.08   -0.35   -0.20   -0.04  7027 1.00
+    sigma_ar    0.70    0.01 0.35    0.25    0.62    1.59   779 1.01
+    sigma_en    0.51    0.00 0.18    0.24    0.49    0.93  1407 1.00
+    lp__     8521.62    0.20 6.09 8509.09 8521.81 8532.93   904 1.00
     
-    Samples were drawn using NUTS(diag_e) at Tue Jul 16 10:52:05 2019.
+    Samples were drawn using NUTS(diag_e) at Wed Jul 17 15:31:11 2019.
     For each parameter, n_eff is a crude measure of effective sample size,
     and Rhat is the potential scale reduction factor on split chains (at 
     convergence, Rhat=1).
-
-``` r
-print(fit_flat, pars=c("alpha_ar", 're_ar', 'sigma_ar', "lp__"), probs=c(.025,.5,.975)) # 
-```
 
     Inference for Stan model: c4c1ff19f358c6c9ee8fb5649733aef4.
     4 chains, each with iter=4000; warmup=2000; thin=1; 
     post-warmup draws per chain=2000, total post-warmup draws=8000.
     
                  mean se_mean   sd    2.5%     50%   97.5% n_eff Rhat
-    alpha_ar     0.92    0.03 0.77   -0.90    1.18    1.83   739    1
-    re_ar[1]     0.40    0.01 0.31   -0.10    0.36    1.09   830    1
-    re_ar[2]     0.51    0.01 0.31    0.04    0.47    1.20   721    1
-    re_ar[3]     0.28    0.01 0.32   -0.23    0.25    0.99   942    1
-    re_ar[4]     0.31    0.01 0.43   -0.50    0.30    1.21  2032    1
-    re_ar[5]    -0.61    0.02 0.71   -2.32   -0.50    0.42  2025    1
-    re_ar[6]    -0.80    0.01 0.56   -2.12   -0.71    0.01  1797    1
-    re_ar[7]     0.63    0.01 0.29    0.19    0.59    1.29   843    1
-    re_ar[8]    -0.24    0.01 0.65   -1.77   -0.18    0.85  4708    1
-    re_ar[9]     0.19    0.01 0.31   -0.32    0.16    0.89  1070    1
-    re_ar[10]    0.73    0.01 0.29    0.30    0.69    1.40   743    1
-    re_ar[11]    0.19    0.01 0.33   -0.37    0.16    0.93  1089    1
-    re_ar[12]    0.01    0.01 0.86   -1.72    0.00    1.79  4730    1
-    re_ar[13]   -0.42    0.01 0.57   -1.73   -0.34    0.47  3027    1
-    re_ar[14]   -0.91    0.02 0.75   -2.73   -0.77    0.14  1581    1
-    re_ar[15]    0.35    0.01 0.32   -0.17    0.31    1.07   913    1
-    re_ar[16]   -0.73    0.02 0.80   -2.65   -0.59    0.33  1240    1
-    sigma_ar     0.73    0.01 0.38    0.25    0.65    1.66   727    1
-    lp__      8521.09    0.23 6.47 8507.85 8521.21 8532.78   793    1
+    alpha_ar     0.97    0.03 0.76   -0.89    1.24    1.84   607 1.01
+    re_ar[1]     0.39    0.01 0.32   -0.10    0.34    1.15   776 1.00
+    re_ar[2]     0.50    0.01 0.32    0.03    0.44    1.25   673 1.00
+    re_ar[3]     0.27    0.01 0.33   -0.23    0.22    1.04   845 1.00
+    re_ar[4]     0.31    0.01 0.43   -0.49    0.29    1.20  2027 1.00
+    re_ar[5]    -0.58    0.01 0.68   -2.16   -0.47    0.45  2785 1.00
+    re_ar[6]    -0.76    0.01 0.53   -2.03   -0.68    0.05  2921 1.00
+    re_ar[7]     0.62    0.01 0.30    0.17    0.57    1.34   777 1.00
+    re_ar[8]    -0.24    0.01 0.63   -1.72   -0.17    0.81  4827 1.00
+    re_ar[9]     0.18    0.01 0.32   -0.33    0.14    0.93   960 1.00
+    re_ar[10]    0.72    0.01 0.30    0.29    0.67    1.45   693 1.00
+    re_ar[11]    0.18    0.01 0.33   -0.36    0.14    0.96  1032 1.00
+    re_ar[12]   -0.01    0.01 0.78   -1.62    0.00    1.56  7757 1.00
+    re_ar[13]   -0.40    0.01 0.54   -1.64   -0.33    0.48  3663 1.00
+    re_ar[14]   -0.85    0.02 0.69   -2.50   -0.74    0.14  1750 1.00
+    re_ar[15]    0.34    0.01 0.33   -0.18    0.30    1.11   833 1.00
+    re_ar[16]   -0.66    0.01 0.70   -2.39   -0.54    0.34  2308 1.00
+    sigma_ar     0.70    0.01 0.35    0.25    0.62    1.59   779 1.01
+    lp__      8521.62    0.20 6.09 8509.09 8521.81 8532.93   904 1.00
     
-    Samples were drawn using NUTS(diag_e) at Tue Jul 16 10:52:05 2019.
+    Samples were drawn using NUTS(diag_e) at Wed Jul 17 15:31:11 2019.
     For each parameter, n_eff is a crude measure of effective sample size,
     and Rhat is the potential scale reduction factor on split chains (at 
     convergence, Rhat=1).
-
-``` r
-print(fit_flat, pars=c("alpha_en", 're_en', 'sigma_en', "lp__"), probs=c(.025,.5,.975)) # 
-```
 
     Inference for Stan model: c4c1ff19f358c6c9ee8fb5649733aef4.
     4 chains, each with iter=4000; warmup=2000; thin=1; 
     post-warmup draws per chain=2000, total post-warmup draws=8000.
     
                  mean se_mean   sd    2.5%     50%   97.5% n_eff Rhat
-    alpha_en     3.54    0.02 0.73    1.79    3.82    4.33   876    1
-    re_en[1]    -0.27    0.00 0.23   -0.71   -0.27    0.19  2369    1
-    re_en[2]     0.30    0.01 0.24   -0.14    0.29    0.81  1420    1
-    re_en[3]     0.54    0.01 0.26    0.03    0.54    1.10  1770    1
-    re_en[4]    -0.28    0.01 0.34   -0.99   -0.27    0.32  3715    1
-    re_en[5]    -0.11    0.00 0.36   -0.86   -0.10    0.57  5233    1
-    re_en[6]     0.57    0.01 0.29    0.04    0.56    1.17  1396    1
-    re_en[7]     0.00    0.00 0.26   -0.50    0.00    0.52  3343    1
-    re_en[8]    -0.53    0.01 0.39   -1.39   -0.49    0.14  3265    1
-    re_en[9]     0.35    0.00 0.22   -0.07    0.34    0.82  2035    1
-    re_en[10]   -0.03    0.01 0.22   -0.45   -0.04    0.42  1779    1
-    re_en[11]    0.43    0.01 0.26   -0.04    0.42    0.96  1948    1
-    re_en[12]   -0.81    0.01 0.50   -1.98   -0.75   -0.01  2799    1
-    re_en[13]   -0.37    0.01 0.30   -0.97   -0.35    0.17  3210    1
-    re_en[14]   -0.01    0.00 0.29   -0.60    0.00    0.56  4029    1
-    re_en[15]    0.47    0.01 0.28   -0.04    0.46    1.04  1848    1
-    re_en[16]   -0.20    0.01 0.33   -0.87   -0.18    0.40  3454    1
-    sigma_en     0.52    0.01 0.19    0.23    0.50    0.96  1293    1
-    lp__      8521.09    0.23 6.47 8507.85 8521.21 8532.78   793    1
+    alpha_en     3.59    0.02 0.69    1.85    3.85    4.32   789 1.01
+    re_en[1]    -0.27    0.00 0.22   -0.70   -0.27    0.18  2870 1.00
+    re_en[2]     0.29    0.01 0.24   -0.14    0.28    0.79  1775 1.00
+    re_en[3]     0.53    0.01 0.26    0.06    0.52    1.06  2195 1.00
+    re_en[4]    -0.27    0.01 0.33   -0.97   -0.26    0.32  3553 1.00
+    re_en[5]    -0.11    0.00 0.35   -0.81   -0.10    0.56  5692 1.00
+    re_en[6]     0.56    0.01 0.28    0.03    0.55    1.15  2111 1.00
+    re_en[7]    -0.01    0.00 0.24   -0.47   -0.01    0.48  3761 1.00
+    re_en[8]    -0.51    0.01 0.38   -1.35   -0.47    0.15  3964 1.00
+    re_en[9]     0.35    0.00 0.22   -0.07    0.34    0.79  2703 1.00
+    re_en[10]   -0.04    0.00 0.21   -0.43   -0.04    0.40  2150 1.00
+    re_en[11]    0.42    0.00 0.25   -0.05    0.42    0.94  2635 1.00
+    re_en[12]   -0.79    0.01 0.51   -1.92   -0.73   -0.01  2737 1.00
+    re_en[13]   -0.36    0.01 0.30   -0.99   -0.34    0.18  3483 1.00
+    re_en[14]   -0.01    0.00 0.29   -0.59   -0.01    0.56  4089 1.00
+    re_en[15]    0.46    0.01 0.26   -0.02    0.45    1.01  2419 1.00
+    re_en[16]   -0.20    0.01 0.32   -0.88   -0.18    0.41  3946 1.00
+    sigma_en     0.51    0.00 0.18    0.24    0.49    0.93  1407 1.00
+    lp__      8521.62    0.20 6.09 8509.09 8521.81 8532.93   904 1.00
     
-    Samples were drawn using NUTS(diag_e) at Tue Jul 16 10:52:05 2019.
+    Samples were drawn using NUTS(diag_e) at Wed Jul 17 15:31:11 2019.
     For each parameter, n_eff is a crude measure of effective sample size,
     and Rhat is the potential scale reduction factor on split chains (at 
     convergence, Rhat=1).
 
-``` r
-traceplot(fit_flat, pars=c("alpha_ar", "phi",  'alpha_en', 'gamma', 'delta','sigma_ar', 'sigma_en', "lp__")) #
-```
-
-<img src="MMR_analyses_files/figure-gfm/runstan_sens-1.png" style="display: block; margin: auto;" />
-
-``` r
-pairs(fit_flat, pars=c("alpha_ar", "phi",  'alpha_en', 'gamma', 'delta', 'sigma_ar', 'sigma_en', "lp__")) #
-```
-
-<img src="MMR_analyses_files/figure-gfm/runstan_sens-2.png" style="display: block; margin: auto;" />
+<img src="MMR_analyses_files/figure-gfm/runstan_sens-1.png" style="display: block; margin: auto;" /><img src="MMR_analyses_files/figure-gfm/runstan_sens-2.png" style="display: block; margin: auto;" />
 
 ### Examine model fits
 

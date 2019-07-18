@@ -3,7 +3,10 @@ title: "Analysis of Measles data in Germany"
 subtitle: "From Ecological inference for infectious disease data, with application to vaccination strategies"
 author: ""
 date: "`r format(Sys.time(), '%d %B, %Y')`"
-output: github_document
+output: 
+  github_document:
+    toc: true
+    toc_depth: 2
 ---
 
     
@@ -657,7 +660,7 @@ data.frame(parameter=c('alpha_ar', 'phi', 'alpha_en', 'gamma', 'delta'),
 
 ### Estimates from fixed effects Stan model
 
-```{r fixed_effects_stan_mod, echo=T, results='markdown'}
+```{r fixed_effects_stan_mod, results='markdown'}
 
 measlesdat2=measlesdat
 measlesdat2$a=c(1, 1) # put a flat prior on phi
@@ -679,7 +682,7 @@ print(fit_fe, pars=c("alpha_ar", "phi",  'alpha_en', 'gamma', 'delta'), probs=c(
 
 ## Sensitivity analysis - measles analysis with non-informative priors
 
-```{r runstan_sens, echo=T, results='markup'}
+```{r runstan_sens,  results='markup'}
 
 measlesdat=list(I=16, # number of areas
                 Ts=78, # number of time points

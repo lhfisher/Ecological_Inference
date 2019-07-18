@@ -1,28 +1,33 @@
-Simulations
-================
-Leigh Fisher
-July 16 2019
+---
+title: "Simulations"
+subtitle: "From Ecological inference for infectious disease data, with application to vaccination strategies"
+author: "Leigh Fisher"
+date: " July 17 2019"
+output: 
+  html_document:
+      toc: true
+      code_folding: hide
+      keep_md: true
+---
+
+    
+
+
+
+
 
 # Introduction and notes
+- This file contains code and analysis for the simulations presented in ``Ecological inference for infectious disease data, with application to vaccination strategies". 
+- All functions are found in ecofall_sim_functions.R
+- This file may take up to an hour to compile. The slowest analysis is the asymptotic analysis. I have reduced the number of simulations for those analyses, and did not re-compile.
 
-  - This file contains code and analysis for the simulations presented
-    in \`\`Ecological inference for infectious disease data, with
-    application to vaccination strategies".
-  - All functions are found in ecofall\_sim\_functions.R
-  - This file may take up to an hour to compile. The slowest analysis is
-    the asymptotic analysis. I have reduced the number of simulations
-    for those analyses, and did not
-re-compile.
+# Simulations to assess simplifying assumptions in the absence of vaccination {.tabset}
 
-# Simulations to assess simplifying assumptions in the absence of vaccination
+For all simulations in this section, we summarize results over 250 simulated populations, each with a population of 100,000 and we assume the endemic component, $\alpha_{EN}$, is -10. 
 
-For all simulations in this section, we summarize results over 250
-simulated populations, each with a population of 100,000 and we assume
-the endemic component, \(\alpha_{EN}\), is -10.
+## $R_0$ = 2.5
 
-## \(R_0\) = 2.5
-
-``` r
+```r
 alpha_ar = log(2.5)
 # 
 set.seed(47)
@@ -46,10 +51,18 @@ res_r0big = plyr::ldply(1:8, function(i){
 })
 ```
 
-Examples of simulated epidemic curves when \(R_0=2.5\)
-<img src="Simulations_files/figure-gfm/eg_r0_big-1.png" width="55%" style="display: block; margin: auto;" />
+Examples of simulated epidemic curves when $R_0=2.5$
+<img src="Simulations_files/figure-html/eg_r0_big-1.png" width="55%" style="display: block; margin: auto;" />
 
-``` r
+
+
+
+
+
+
+
+
+```r
 # 
 par(mfrow=c(2, 1), mar=c(3.75, 3, 0.5, 0.5)+0.15, oma=c(0.2, 1.5, 0, 0))
 ## Plots of estimates
@@ -159,30 +172,37 @@ mtext(1, at=c(2.5, 6.5), text=c('Binomial', 'Poisson'), line=3, cex=1)
 points(x=1:8, y=res_r0big$MSE.en, pch=16)
 ```
 
-<img src="Simulations_files/figure-gfm/bias_mse_r0_big-1.png" title="Red lines indicate true parameter value; blue line is at zero." alt="Red lines indicate true parameter value; blue line is at zero." width="33%" /><img src="Simulations_files/figure-gfm/bias_mse_r0_big-2.png" title="Red lines indicate true parameter value; blue line is at zero." alt="Red lines indicate true parameter value; blue line is at zero." width="33%" /><img src="Simulations_files/figure-gfm/bias_mse_r0_big-3.png" title="Red lines indicate true parameter value; blue line is at zero." alt="Red lines indicate true parameter value; blue line is at zero." width="33%" />
+<div class="figure">
+<img src="Simulations_files/figure-html/bias_mse_r0_big-1.png" alt="Red lines indicate true parameter value; blue line is at zero." width="33%" /><img src="Simulations_files/figure-html/bias_mse_r0_big-2.png" alt="Red lines indicate true parameter value; blue line is at zero." width="33%" /><img src="Simulations_files/figure-html/bias_mse_r0_big-3.png" alt="Red lines indicate true parameter value; blue line is at zero." width="33%" />
+<p class="caption">Red lines indicate true parameter value; blue line is at zero.</p>
+</div>
 
-``` r
+
+
+```r
 # 
 kable(res_r0big, caption=paste('Summary of parameter estimates from', Nsims, 'simulations, where alpha_ar =', sprintf('%.3f', alpha_ar), 'and alpha_en =', alpha_en ), digits=3)
 ```
 
-| mod |  Est.ar | pct.025.ar | pct.975.ar | Bias.ar | MSE.ar |   Est.en | pct.025.en | pct.975.en | Bias.en | MSE.en |
-| --: | ------: | ---------: | ---------: | ------: | -----: | -------: | ---------: | ---------: | ------: | -----: |
-|   1 |   0.916 |      0.910 |      0.923 |   0.000 |  0.000 | \-10.003 |   \-10.244 |    \-9.790 | \-0.003 |  0.014 |
-|   2 |   0.073 |      0.072 |      0.074 | \-0.843 |  0.711 | \-12.606 |   \-12.839 |   \-12.416 | \-2.606 |  6.802 |
-|   3 |   0.726 |      0.722 |      0.730 | \-0.191 |  0.036 |  \-9.874 |   \-10.115 |    \-9.660 |   0.126 |  0.031 |
-|   4 | \-0.020 |    \-0.021 |    \-0.019 | \-0.936 |  0.877 | \-12.573 |   \-12.806 |   \-12.374 | \-2.573 |  6.632 |
-|   5 |   0.916 |      0.909 |      0.922 |   0.000 |  0.000 | \-10.003 |   \-10.244 |    \-9.785 | \-0.003 |  0.014 |
-|   6 |   0.089 |      0.087 |      0.091 | \-0.827 |  0.685 | \-12.612 |   \-12.845 |   \-12.417 | \-2.612 |  6.834 |
-|   7 |   0.743 |      0.739 |      0.747 | \-0.173 |  0.030 |  \-9.890 |   \-10.133 |    \-9.678 |   0.110 |  0.027 |
-|   8 | \-0.002 |    \-0.003 |    \-0.001 | \-0.919 |  0.844 | \-12.576 |   \-12.805 |   \-12.346 | \-2.576 |  6.649 |
 
-Summary of parameter estimates from 250 simulations, where alpha\_ar =
-0.916 and alpha\_en = -10
 
-## \(R_0 = 1\)
+Table: Summary of parameter estimates from 250 simulations, where alpha_ar = 0.916 and alpha_en = -10
 
-``` r
+ mod   Est.ar   pct.025.ar   pct.975.ar   Bias.ar   MSE.ar    Est.en   pct.025.en   pct.975.en   Bias.en   MSE.en
+----  -------  -----------  -----------  --------  -------  --------  -----------  -----------  --------  -------
+   1    0.916        0.910        0.923     0.000    0.000   -10.003      -10.244       -9.790    -0.003    0.014
+   2    0.073        0.072        0.074    -0.843    0.711   -12.606      -12.839      -12.416    -2.606    6.802
+   3    0.726        0.722        0.730    -0.191    0.036    -9.874      -10.115       -9.660     0.126    0.031
+   4   -0.020       -0.021       -0.019    -0.936    0.877   -12.573      -12.806      -12.374    -2.573    6.632
+   5    0.916        0.909        0.922     0.000    0.000   -10.003      -10.244       -9.785    -0.003    0.014
+   6    0.089        0.087        0.091    -0.827    0.685   -12.612      -12.845      -12.417    -2.612    6.834
+   7    0.743        0.739        0.747    -0.173    0.030    -9.890      -10.133       -9.678     0.110    0.027
+   8   -0.002       -0.003       -0.001    -0.919    0.844   -12.576      -12.805      -12.346    -2.576    6.649
+
+
+## $R_0 = 1$
+
+```r
 alpha_ar = log(1)
 
 set.seed(47)
@@ -206,10 +226,12 @@ res_r0mod = plyr::ldply(1:8, function(i){
 })
 ```
 
-Examples of simulated epidemic curves when \(R_0=1\)
-<img src="Simulations_files/figure-gfm/eg_r0_mod-1.png" width="55%" style="display: block; margin: auto;" />
+Examples of simulated epidemic curves when $R_0=1$
+<img src="Simulations_files/figure-html/eg_r0_mod-1.png" width="55%" style="display: block; margin: auto;" />
 
-``` r
+
+
+```r
 par(mfrow=c(2, 1), mar=c(3.75, 3, 0.5, 0.5)+0.15, oma=c(0.2, 1.5, 0, 0))
 ## Plots of estimates
 rng.ar = range(res_r0mod$Est.ar, res_r0mod$pct.025.ar, res_r0mod$pct.975.ar, alpha_ar)
@@ -318,29 +340,35 @@ mtext(1, at=c(2.5, 6.5), text=c('Binomial', 'Poisson'), line=3, cex=1)
 points(x=1:8, y=res_r0mod$MSE.en, pch=16)
 ```
 
-<img src="Simulations_files/figure-gfm/bias_mse_r0_mod-1.png" title="Red lines indicate true parameter value; blue line is at zero." alt="Red lines indicate true parameter value; blue line is at zero." width="33%" /><img src="Simulations_files/figure-gfm/bias_mse_r0_mod-2.png" title="Red lines indicate true parameter value; blue line is at zero." alt="Red lines indicate true parameter value; blue line is at zero." width="33%" /><img src="Simulations_files/figure-gfm/bias_mse_r0_mod-3.png" title="Red lines indicate true parameter value; blue line is at zero." alt="Red lines indicate true parameter value; blue line is at zero." width="33%" />
+<div class="figure">
+<img src="Simulations_files/figure-html/bias_mse_r0_mod-1.png" alt="Red lines indicate true parameter value; blue line is at zero." width="33%" /><img src="Simulations_files/figure-html/bias_mse_r0_mod-2.png" alt="Red lines indicate true parameter value; blue line is at zero." width="33%" /><img src="Simulations_files/figure-html/bias_mse_r0_mod-3.png" alt="Red lines indicate true parameter value; blue line is at zero." width="33%" />
+<p class="caption">Red lines indicate true parameter value; blue line is at zero.</p>
+</div>
 
-``` r
+
+```r
 kable(res_r0mod, caption=paste('Summary of parameter estimates from', Nsims, 'simulations, where alpha_ar =', sprintf('%.3f', alpha_ar), 'and alpha_en =', alpha_en ), digits=4)
 ```
 
-| mod |   Est.ar | pct.025.ar | pct.975.ar |  Bias.ar | MSE.ar |    Est.en | pct.025.en | pct.975.en |  Bias.en | MSE.en |
-| --: | -------: | ---------: | ---------: | -------: | -----: | --------: | ---------: | ---------: | -------: | -----: |
-|   1 | \-0.0097 |   \-0.0758 |     0.0259 | \-0.0097 | 0.0007 |  \-9.9181 |  \-10.4353 |   \-9.3373 |   0.0819 | 0.0851 |
-|   2 | \-0.0416 |   \-0.1019 |   \-0.0150 | \-0.0416 | 0.0022 | \-10.5054 |  \-11.3577 |   \-9.6039 | \-0.5054 | 0.4303 |
-|   3 | \-0.0104 |   \-0.0784 |     0.0258 | \-0.0104 | 0.0007 |  \-9.9150 |  \-10.4178 |   \-9.3384 |   0.0850 | 0.0851 |
-|   4 | \-0.0416 |   \-0.0956 |   \-0.0162 | \-0.0416 | 0.0021 | \-10.5051 |  \-11.3486 |   \-9.6409 | \-0.5051 | 0.4158 |
-|   5 | \-0.0097 |   \-0.0758 |     0.0262 | \-0.0097 | 0.0007 |  \-9.9181 |  \-10.4353 |   \-9.3373 |   0.0819 | 0.0851 |
-|   6 | \-0.0416 |   \-0.1019 |   \-0.0150 | \-0.0416 | 0.0022 | \-10.5048 |  \-11.3577 |   \-9.6039 | \-0.5048 | 0.4296 |
-|   7 | \-0.0104 |   \-0.0784 |     0.0258 | \-0.0104 | 0.0007 |  \-9.9149 |  \-10.4178 |   \-9.3384 |   0.0851 | 0.0849 |
-|   8 | \-0.0416 |   \-0.0956 |   \-0.0162 | \-0.0416 | 0.0021 | \-10.5050 |  \-11.3486 |   \-9.6409 | \-0.5050 | 0.4155 |
 
-Summary of parameter estimates from 250 simulations, where alpha\_ar =
-0.000 and alpha\_en = -10
 
-## \(R_0 = 0.75\)
+Table: Summary of parameter estimates from 250 simulations, where alpha_ar = 0.000 and alpha_en = -10
 
-``` r
+ mod    Est.ar   pct.025.ar   pct.975.ar   Bias.ar   MSE.ar     Est.en   pct.025.en   pct.975.en   Bias.en   MSE.en
+----  --------  -----------  -----------  --------  -------  ---------  -----------  -----------  --------  -------
+   1   -0.0097      -0.0758       0.0259   -0.0097   0.0007    -9.9181     -10.4353      -9.3373    0.0819   0.0851
+   2   -0.0416      -0.1019      -0.0150   -0.0416   0.0022   -10.5054     -11.3577      -9.6039   -0.5054   0.4303
+   3   -0.0104      -0.0784       0.0258   -0.0104   0.0007    -9.9150     -10.4178      -9.3384    0.0850   0.0851
+   4   -0.0416      -0.0956      -0.0162   -0.0416   0.0021   -10.5051     -11.3486      -9.6409   -0.5051   0.4158
+   5   -0.0097      -0.0758       0.0262   -0.0097   0.0007    -9.9181     -10.4353      -9.3373    0.0819   0.0851
+   6   -0.0416      -0.1019      -0.0150   -0.0416   0.0022   -10.5048     -11.3577      -9.6039   -0.5048   0.4296
+   7   -0.0104      -0.0784       0.0258   -0.0104   0.0007    -9.9149     -10.4178      -9.3384    0.0851   0.0849
+   8   -0.0416      -0.0956      -0.0162   -0.0416   0.0021   -10.5050     -11.3486      -9.6409   -0.5050   0.4155
+
+
+##  $R_0 = 0.75$
+
+```r
 alpha_ar = log(0.75)
 
 set.seed(47)
@@ -364,10 +392,13 @@ res_r0lo = plyr::ldply(1:8, function(i){
 })
 ```
 
-Examples of simulated epidemic curves when \(R_0=0.75\)
-<img src="Simulations_files/figure-gfm/eg_r0_lo-1.png" width="55%" style="display: block; margin: auto;" />
+Examples of simulated epidemic curves when $R_0=0.75$
+<img src="Simulations_files/figure-html/eg_r0_lo-1.png" width="55%" style="display: block; margin: auto;" />
 
-``` r
+
+
+
+```r
 par(mfrow=c(2, 1), mar=c(3.75, 3, 0.5, 0.5)+0.15, oma=c(0.2, 1.5, 0, 0))
 ## Plots of estimates
 rng.ar = range(res_r0lo$Est.ar, res_r0lo$pct.025.ar, res_r0lo$pct.975.ar, alpha_ar)
@@ -479,30 +510,36 @@ points(x=1:8, y=res_r0lo$MSE.en, pch=16)
 # 
 ```
 
-<img src="Simulations_files/figure-gfm/bias_mse_r0_lo-1.png" title="Red lines indicate true parameter value; blue line is at zero." alt="Red lines indicate true parameter value; blue line is at zero." width="33%" /><img src="Simulations_files/figure-gfm/bias_mse_r0_lo-2.png" title="Red lines indicate true parameter value; blue line is at zero." alt="Red lines indicate true parameter value; blue line is at zero." width="33%" /><img src="Simulations_files/figure-gfm/bias_mse_r0_lo-3.png" title="Red lines indicate true parameter value; blue line is at zero." alt="Red lines indicate true parameter value; blue line is at zero." width="33%" />
+<div class="figure">
+<img src="Simulations_files/figure-html/bias_mse_r0_lo-1.png" alt="Red lines indicate true parameter value; blue line is at zero." width="33%" /><img src="Simulations_files/figure-html/bias_mse_r0_lo-2.png" alt="Red lines indicate true parameter value; blue line is at zero." width="33%" /><img src="Simulations_files/figure-html/bias_mse_r0_lo-3.png" alt="Red lines indicate true parameter value; blue line is at zero." width="33%" />
+<p class="caption">Red lines indicate true parameter value; blue line is at zero.</p>
+</div>
 
-``` r
+
+```r
 # 
 kable(res_r0lo, caption=paste('Summary of parameter estimates from', Nsims, 'simulations, where alpha_ar =', sprintf('%.3f', alpha_ar), 'and alpha_en =', alpha_en ), digits=4)
 ```
 
-| mod |   Est.ar | pct.025.ar | pct.975.ar |  Bias.ar | MSE.ar |   Est.en | pct.025.en | pct.975.en | Bias.en | MSE.en |
-| --: | -------: | ---------: | ---------: | -------: | -----: | -------: | ---------: | ---------: | ------: | -----: |
-|   1 | \-0.3137 |   \-0.4674 |   \-0.1993 | \-0.0261 | 0.0065 | \-9.9595 |  \-10.3147 |   \-9.6225 |  0.0405 | 0.0372 |
-|   2 | \-0.3274 |   \-0.4820 |   \-0.2076 | \-0.0397 | 0.0075 | \-9.9741 |  \-10.3469 |   \-9.6231 |  0.0259 | 0.0368 |
-|   3 | \-0.3139 |   \-0.4674 |   \-0.1993 | \-0.0262 | 0.0065 | \-9.9592 |  \-10.3147 |   \-9.6232 |  0.0408 | 0.0371 |
-|   4 | \-0.3275 |   \-0.4843 |   \-0.2071 | \-0.0399 | 0.0075 | \-9.9741 |  \-10.3493 |   \-9.6229 |  0.0259 | 0.0369 |
-|   5 | \-0.3138 |   \-0.4674 |   \-0.1993 | \-0.0261 | 0.0065 | \-9.9594 |  \-10.3147 |   \-9.6225 |  0.0406 | 0.0372 |
-|   6 | \-0.3274 |   \-0.4820 |   \-0.2076 | \-0.0397 | 0.0075 | \-9.9741 |  \-10.3469 |   \-9.6231 |  0.0259 | 0.0368 |
-|   7 | \-0.3139 |   \-0.4674 |   \-0.1993 | \-0.0262 | 0.0065 | \-9.9592 |  \-10.3147 |   \-9.6232 |  0.0408 | 0.0371 |
-|   8 | \-0.3276 |   \-0.4843 |   \-0.2071 | \-0.0399 | 0.0075 | \-9.9740 |  \-10.3493 |   \-9.6229 |  0.0260 | 0.0370 |
 
-Summary of parameter estimates from 250 simulations, where alpha\_ar =
--0.288 and alpha\_en = -10
+
+Table: Summary of parameter estimates from 250 simulations, where alpha_ar = -0.288 and alpha_en = -10
+
+ mod    Est.ar   pct.025.ar   pct.975.ar   Bias.ar   MSE.ar    Est.en   pct.025.en   pct.975.en   Bias.en   MSE.en
+----  --------  -----------  -----------  --------  -------  --------  -----------  -----------  --------  -------
+   1   -0.3137      -0.4674      -0.1993   -0.0261   0.0065   -9.9595     -10.3147      -9.6225    0.0405   0.0372
+   2   -0.3274      -0.4820      -0.2076   -0.0397   0.0075   -9.9741     -10.3469      -9.6231    0.0259   0.0368
+   3   -0.3139      -0.4674      -0.1993   -0.0262   0.0065   -9.9592     -10.3147      -9.6232    0.0408   0.0371
+   4   -0.3275      -0.4843      -0.2071   -0.0399   0.0075   -9.9741     -10.3493      -9.6229    0.0259   0.0369
+   5   -0.3138      -0.4674      -0.1993   -0.0261   0.0065   -9.9594     -10.3147      -9.6225    0.0406   0.0372
+   6   -0.3274      -0.4820      -0.2076   -0.0397   0.0075   -9.9741     -10.3469      -9.6231    0.0259   0.0368
+   7   -0.3139      -0.4674      -0.1993   -0.0262   0.0065   -9.9592     -10.3147      -9.6232    0.0408   0.0371
+   8   -0.3276      -0.4843      -0.2071   -0.0399   0.0075   -9.9740     -10.3493      -9.6229    0.0260   0.0370
+
 
 ## Summary
 
-``` r
+```r
 r0_cols=c('#D92321', '#FF6F1B', '#0AB7C9')
 
 
@@ -590,11 +627,13 @@ points(x=1:8+0.15, y=res_r0lo$MSE.en, pch=16, col=r0_cols[3])
 legend('top', legend=c(expression(R[0]==2.5), expression(R[0]==1), expression(R[0]==0.75)), col=r0_cols, pch=rep(16), bty='n', horiz=T, xpd=T, inset=c(0, -0.1))
 ```
 
-<img src="Simulations_files/figure-gfm/sum_sim_novacc-1.png" width="50%" /><img src="Simulations_files/figure-gfm/sum_sim_novacc-2.png" width="50%" /><img src="Simulations_files/figure-gfm/sum_sim_novacc-3.png" width="50%" /><img src="Simulations_files/figure-gfm/sum_sim_novacc-4.png" width="50%" />
+<img src="Simulations_files/figure-html/sum_sim_novacc-1.png" width="50%" /><img src="Simulations_files/figure-html/sum_sim_novacc-2.png" width="50%" /><img src="Simulations_files/figure-html/sum_sim_novacc-3.png" width="50%" /><img src="Simulations_files/figure-html/sum_sim_novacc-4.png" width="50%" />
 
-# Simulations in partially vaccinated populations
 
-``` r
+# Simulations in partially vaccinated populations {.tabset}
+
+
+```r
 source('ecofall_sim_functions.R')
 
 N=rep(1e5, 5)
@@ -609,9 +648,10 @@ Nwks=52*3 # Number of weeks
 sts=c(0.5, 0, 1)
 ```
 
+
 Below, we plot examples of a population consisting of 5 areas
 
-``` r
+```r
 pltcols=rev(brewer.pal(6, 'PuRd')[-1])
 axis.pts=c(0.5, 1, 2, 5, c(1, 2, 5)*10, c(1, 2, 5)*1e2, c(1, 2, 5)*1e3, c(1, 2, 5)*1e4, c(1, 2, 5)*1e5)
 axis.labs=c(0, 1, 2, 5, c(1, 2, 5)*10, c(1, 2, 5)*1e2, c(1, 2, 5)*1e3, c(1, 2, 5)*1e4, c(1, 2, 5)*1e5)
@@ -646,9 +686,10 @@ axis(2, at=axis.pts, labels=axis.labs, las=2, cex.axis=0.85)
 legend('topright', legend=c('R', format(reff, 2), expression(x[i]),  paste0(100*x, '%')), ncol=2, lty=c(rep(NA, 7), rep(1, 5)), col=c(rep(NA, 7), pltcols), bty='n', cex=0.75)
 ```
 
-<img src="Simulations_files/figure-gfm/sim_partial_vacc-1.png" width="33%" /><img src="Simulations_files/figure-gfm/sim_partial_vacc-2.png" width="33%" /><img src="Simulations_files/figure-gfm/sim_partial_vacc-3.png" width="33%" />
+<img src="Simulations_files/figure-html/sim_partial_vacc-1.png" width="33%" /><img src="Simulations_files/figure-html/sim_partial_vacc-2.png" width="33%" /><img src="Simulations_files/figure-html/sim_partial_vacc-3.png" width="33%" />
 
-``` r
+
+```r
 reff=exp(alpha_ar)*(1-phi*x)
 
 par(mar=c(0, 0, 0, 0))
@@ -659,7 +700,9 @@ legend(x=0, y=1, legend=c('R', format(reff, digits=2)), ncol=1, lty=c(rep(NA, 7)
 legend(x=0.4, y=1, legend=c(expression(x[i]),  paste0(100*x, '%')), ncol=1, lty=c(NA, rep(1, 5)), col=c(NA, pltcols), bty='n', x.intersp = 0.5, seg.len=1)
 ```
 
-``` r
+
+
+```r
 vals=c(alpha_ar, alpha_en, phi)
 
 set.seed(4747)
@@ -707,9 +750,12 @@ res_lk = plyr::ldply(1:4, function(i){
 })
 ```
 
+
+
+
 ## All-or-none vaccine
 
-``` r
+```r
 mod1.ests=sapply(aon_sims['mod1', ], function(x){x$par})
 mod1.est=rowMeans(mod1.ests)
 mod1.qt=apply(mod1.ests, 1, function(x){quantile(x, c(0.025, 0.975))})
@@ -760,7 +806,8 @@ segments(x0=2, x1=2, y0=expit(mod2.qt[1, 3]), y1=expit(mod2.qt[2, 3]))
 segments(x0=3, x1=3, y0=expit(mod3.qt[1, 3]), y1=expit(mod3.qt[2, 3]))
 ```
 
-``` r
+
+```r
 par(mar=c(3, 3.1, 0, 0)+0.2)
 
 ## Plot Estimates
@@ -845,22 +892,24 @@ kable(cbind(c('All-or-none', 'Leaky', 'Ecological', 'Epidemic-Endemic'), res_aon
       )
 ```
 
-| Model            | Est AR | 2.5% AR | 97.5% AR | Bias AR | MSE AR | Est EN | 2.5% EN | 97.5% EN | Bias EN | MSE EN | Est Phi | 2.5% Phi | 97.5% Phi | Bias Phi | MSE Phi |
-| :--------------- | -----: | ------: | -------: | ------: | -----: | -----: | ------: | -------: | ------: | -----: | ------: | -------: | --------: | -------: | ------: |
-| All-or-none      |  0.680 |   0.588 |    0.742 | \-0.013 |  0.002 |  1.009 |   0.769 |    1.216 |   0.009 |  0.013 |   0.798 |    0.775 |     0.822 |  \-0.002 |   0.000 |
-| Leaky            |  0.680 |   0.588 |    0.741 | \-0.013 |  0.002 |  1.010 |   0.771 |    1.218 |   0.010 |  0.013 |   0.799 |    0.776 |     0.822 |  \-0.001 |   0.000 |
-| Ecological       |  0.661 |   0.353 |    0.894 | \-0.032 |  0.019 |  1.004 |   0.566 |    1.428 |   0.004 |  0.051 |   0.787 |    0.571 |     0.923 |  \-0.013 |   0.009 |
-| Epidemic-Endemic |  0.513 |   0.165 |    0.861 | \-0.181 |  0.062 |  0.056 | \-0.174 |    0.266 | \-0.944 |  0.905 |   0.631 |    0.564 |     0.701 |  \-0.169 |   0.030 |
 
-Summary of parameter estimates from 250 simulations, where alpha\_ar =
-0.693 alpha\_en = 1 and an all-or-none vaccine effect of
-0.8
 
-<img src="Simulations_files/figure-gfm/summary_aon_sims-1.png" width="33%" /><img src="Simulations_files/figure-gfm/summary_aon_sims-2.png" width="33%" /><img src="Simulations_files/figure-gfm/summary_aon_sims-3.png" width="33%" /><img src="Simulations_files/figure-gfm/summary_aon_sims-4.png" width="33%" /><img src="Simulations_files/figure-gfm/summary_aon_sims-5.png" width="33%" /><img src="Simulations_files/figure-gfm/summary_aon_sims-6.png" width="33%" /><img src="Simulations_files/figure-gfm/summary_aon_sims-7.png" width="33%" /><img src="Simulations_files/figure-gfm/summary_aon_sims-8.png" width="33%" /><img src="Simulations_files/figure-gfm/summary_aon_sims-9.png" width="33%" />
+Table: Summary of parameter estimates from 250 simulations, where alpha_ar = 0.693 alpha_en = 1 and an all-or-none vaccine effect of 0.8
+
+Model               Est AR   2.5% AR   97.5% AR   Bias AR   MSE AR   Est EN   2.5% EN   97.5% EN   Bias EN   MSE EN   Est Phi   2.5% Phi   97.5% Phi   Bias Phi   MSE Phi
+-----------------  -------  --------  ---------  --------  -------  -------  --------  ---------  --------  -------  --------  ---------  ----------  ---------  --------
+All-or-none          0.680     0.588      0.742    -0.013    0.002    1.009     0.769      1.216     0.009    0.013     0.798      0.775       0.822     -0.002     0.000
+Leaky                0.680     0.588      0.741    -0.013    0.002    1.010     0.771      1.218     0.010    0.013     0.799      0.776       0.822     -0.001     0.000
+Ecological           0.661     0.353      0.894    -0.032    0.019    1.004     0.566      1.428     0.004    0.051     0.787      0.571       0.923     -0.013     0.009
+Epidemic-Endemic     0.513     0.165      0.861    -0.181    0.062    0.056    -0.174      0.266    -0.944    0.905     0.631      0.564       0.701     -0.169     0.030
+
+<img src="Simulations_files/figure-html/summary_aon_sims-1.png" width="33%" /><img src="Simulations_files/figure-html/summary_aon_sims-2.png" width="33%" /><img src="Simulations_files/figure-html/summary_aon_sims-3.png" width="33%" /><img src="Simulations_files/figure-html/summary_aon_sims-4.png" width="33%" /><img src="Simulations_files/figure-html/summary_aon_sims-5.png" width="33%" /><img src="Simulations_files/figure-html/summary_aon_sims-6.png" width="33%" /><img src="Simulations_files/figure-html/summary_aon_sims-7.png" width="33%" /><img src="Simulations_files/figure-html/summary_aon_sims-8.png" width="33%" /><img src="Simulations_files/figure-html/summary_aon_sims-9.png" width="33%" />
+
 
 ## Leaky vaccine
 
-``` r
+
+```r
 mod1.ests=sapply(lk_sims['mod1', ], function(x){x$par})
 mod1.est=rowMeans(mod1.ests)
 mod1.qt=apply(mod1.ests, 1, function(x){quantile(x, c(0.025, 0.975))})
@@ -913,7 +962,10 @@ segments(x0=2, x1=2, y0=expit(mod2.qt[1, 3]), y1=expit(mod2.qt[2, 3]))
 segments(x0=3, x1=3, y0=expit(mod3.qt[1, 3]), y1=expit(mod3.qt[2, 3]))
 ```
 
-``` r
+
+
+
+```r
 # kable(res_lk, caption=paste('Summary of parameter estimates from', Nsims, 'simulations, where alpha_ar =', alpha_ar, 'alpha_en =', alpha_en, 'and a leaky vaccine effect of', phi ))
 
 # 
@@ -1008,22 +1060,24 @@ kable(cbind(c('All-or-none', 'Leaky', 'Ecological', 'Epidemic-Endemic'), res_lk[
       )
 ```
 
-| Model            | Est AR | 2.5% AR | 97.5% AR | Bias AR | MSE AR | Est EN | 2.5% EN | 97.5% EN | Bias EN | MSE EN | Est Phi | 2.5% Phi | 97.5% Phi | Bias Phi | MSE Phi |
-| :--------------- | -----: | ------: | -------: | ------: | -----: | -----: | ------: | -------: | ------: | -----: | ------: | -------: | --------: | -------: | ------: |
-| All-or-none      |  0.681 |   0.582 |    0.744 | \-0.012 |  0.002 |  0.999 |   0.786 |    1.221 | \-0.001 |  0.013 |   0.798 |    0.772 |     0.819 |  \-0.002 |   0.000 |
-| Leaky            |  0.681 |   0.582 |    0.743 | \-0.013 |  0.002 |  1.001 |   0.789 |    1.223 |   0.001 |  0.013 |   0.799 |    0.773 |     0.820 |  \-0.001 |   0.000 |
-| Ecological       |  0.657 |   0.365 |    0.912 | \-0.036 |  0.021 |  0.990 |   0.555 |    1.441 | \-0.010 |  0.050 |   0.784 |    0.600 |     0.951 |  \-0.016 |   0.009 |
-| Epidemic-Endemic |  0.508 |   0.191 |    0.872 | \-0.186 |  0.070 |  0.045 | \-0.158 |    0.284 | \-0.955 |  0.924 |   0.630 |    0.570 |     0.704 |  \-0.170 |   0.030 |
 
-Summary of parameter estimates from 250 simulations, where alpha\_ar =
-0.693 alpha\_en = 1 and a leaky vaccine effect of
-0.8
 
-<img src="Simulations_files/figure-gfm/summary_lk_sims-1.png" width="33%" /><img src="Simulations_files/figure-gfm/summary_lk_sims-2.png" width="33%" /><img src="Simulations_files/figure-gfm/summary_lk_sims-3.png" width="33%" /><img src="Simulations_files/figure-gfm/summary_lk_sims-4.png" width="33%" /><img src="Simulations_files/figure-gfm/summary_lk_sims-5.png" width="33%" /><img src="Simulations_files/figure-gfm/summary_lk_sims-6.png" width="33%" /><img src="Simulations_files/figure-gfm/summary_lk_sims-7.png" width="33%" /><img src="Simulations_files/figure-gfm/summary_lk_sims-8.png" width="33%" /><img src="Simulations_files/figure-gfm/summary_lk_sims-9.png" width="33%" />
+Table: Summary of parameter estimates from 250 simulations, where alpha_ar = 0.693 alpha_en = 1 and a leaky vaccine effect of 0.8
+
+Model               Est AR   2.5% AR   97.5% AR   Bias AR   MSE AR   Est EN   2.5% EN   97.5% EN   Bias EN   MSE EN   Est Phi   2.5% Phi   97.5% Phi   Bias Phi   MSE Phi
+-----------------  -------  --------  ---------  --------  -------  -------  --------  ---------  --------  -------  --------  ---------  ----------  ---------  --------
+All-or-none          0.681     0.582      0.744    -0.012    0.002    0.999     0.786      1.221    -0.001    0.013     0.798      0.772       0.819     -0.002     0.000
+Leaky                0.681     0.582      0.743    -0.013    0.002    1.001     0.789      1.223     0.001    0.013     0.799      0.773       0.820     -0.001     0.000
+Ecological           0.657     0.365      0.912    -0.036    0.021    0.990     0.555      1.441    -0.010    0.050     0.784      0.600       0.951     -0.016     0.009
+Epidemic-Endemic     0.508     0.191      0.872    -0.186    0.070    0.045    -0.158      0.284    -0.955    0.924     0.630      0.570       0.704     -0.170     0.030
+
+<img src="Simulations_files/figure-html/summary_lk_sims-1.png" width="33%" /><img src="Simulations_files/figure-html/summary_lk_sims-2.png" width="33%" /><img src="Simulations_files/figure-html/summary_lk_sims-3.png" width="33%" /><img src="Simulations_files/figure-html/summary_lk_sims-4.png" width="33%" /><img src="Simulations_files/figure-html/summary_lk_sims-5.png" width="33%" /><img src="Simulations_files/figure-html/summary_lk_sims-6.png" width="33%" /><img src="Simulations_files/figure-html/summary_lk_sims-7.png" width="33%" /><img src="Simulations_files/figure-html/summary_lk_sims-8.png" width="33%" /><img src="Simulations_files/figure-html/summary_lk_sims-9.png" width="33%" />
+
 
 # Simulations to assess asymptotic behavior of ecological vaccine model
 
-``` r
+
+```r
 Nsims=100
 pmt=proc.time()
 set.seed(47)
@@ -1031,15 +1085,16 @@ asym_sims=replicate(Nsims, sim.one(vacc='AoN', N=N, Nwks=52*20, alpha_ar=alpha_a
 proc.time()-pmt
 ```
 
-user system elapsed 2720.43 32.19 2848.21
+   user  system elapsed 
+2696.47   66.32 2888.22 
 
-``` r
+```r
 # 
 ```
 
 Example of epidemic curve
 
-``` r
+```r
 tmp=t(asym_sims['dat', 1]$dat$Y)
 tmp[which(tmp==0)]=0.5
 k=seq(0, dim(tmp)[1], by=52 )
@@ -1050,15 +1105,15 @@ legend('topleft', legend=c('R', round(exp(alpha_ar)*(1-phi*x), 2), 'x_i',  x), n
 mtext(side=3, text=bquote(paste(R[0], ' = ', .(exp(alpha_ar)), '  ', nu, ' = ', .(round(exp(alpha_en), 2)) , '  ', phi, ' = ', .(phi) ) ), at=Nwks/2, line=0)
 ```
 
-![](Simulations_files/figure-gfm/asymptotic_eg-1.png)<!-- -->
+![](Simulations_files/figure-html/asymptotic_eg-1.png)<!-- -->
 
-``` r
+```r
 # 
 ```
 
 Simulation results
 
-``` r
+```r
 mod1.ests=sapply(asym_sims['mod1', ], function(x){x$par})
 mod1.se=sapply(asym_sims['mod1', ], function(x){sqrt(diag(solve(x$hessian)))})
 table(sapply(asym_sims['mod1', ], function(x){x$convergence}))
@@ -1113,7 +1168,9 @@ segments(x0=2, x1=2, y0=mean(expit(mod2.ests[3, ]-1.96*mod2.se[3, ])), y1=mean(e
 segments(x0=3, x1=3, y0=mean(expit(mod3.ests[3, ]-1.96*mod3.se[3, ])), y1=mean(expit(mod3.ests[3, ]+1.96*mod3.se[3, ])))
 ```
 
-``` r
+
+
+```r
 vals=c(alpha_ar, alpha_en, phi)
 
 res_asym = plyr::ldply(1:4, function(i){
@@ -1226,15 +1283,16 @@ kable(cbind(c('All-or-none', 'Leaky', 'Ecological', 'Epidemic-Endemic'), res_asy
       )
 ```
 
-| Model            | Est AR | 2.5% AR | 97.5% AR | Bias AR | MSE AR | Est EN | 2.5% EN | 97.5% EN | Bias EN | MSE EN | Est Phi | 2.5% Phi | 97.5% Phi | Bias Phi | MSE Phi |
-| :--------------- | -----: | ------: | -------: | ------: | -----: | -----: | ------: | -------: | ------: | -----: | ------: | -------: | --------: | -------: | ------: |
-| All-or-none      |  0.692 |   0.653 |    0.717 | \-0.001 |  0.000 |  1.007 |   0.922 |    1.088 |   0.007 |  0.002 |   0.800 |    0.791 |     0.810 |    0.000 |   0.000 |
-| Leaky            |  0.692 |   0.653 |    0.716 | \-0.001 |  0.000 |  1.011 |   0.927 |    1.093 |   0.011 |  0.002 |   0.804 |    0.794 |     0.814 |    0.004 |   0.000 |
-| Ecological       |  0.614 |   0.523 |    0.718 | \-0.079 |  0.009 |  0.927 |   0.769 |    1.089 | \-0.073 |  0.012 |   0.767 |    0.698 |     0.835 |  \-0.033 |   0.002 |
-| Epidemic-Endemic |  0.449 |   0.337 |    0.597 | \-0.244 |  0.064 |  0.041 | \-0.033 |    0.123 | \-0.959 |  0.922 |   0.621 |    0.598 |     0.650 |  \-0.179 |   0.032 |
 
-Summary of parameter estimates from 100 simulations, where alpha\_ar =
-0.693 alpha\_en = 1 and a leaky vaccine effect of
-0.8
 
-<img src="Simulations_files/figure-gfm/summary_asymp_sims-1.png" width="33%" /><img src="Simulations_files/figure-gfm/summary_asymp_sims-2.png" width="33%" /><img src="Simulations_files/figure-gfm/summary_asymp_sims-3.png" width="33%" /><img src="Simulations_files/figure-gfm/summary_asymp_sims-4.png" width="33%" /><img src="Simulations_files/figure-gfm/summary_asymp_sims-5.png" width="33%" /><img src="Simulations_files/figure-gfm/summary_asymp_sims-6.png" width="33%" /><img src="Simulations_files/figure-gfm/summary_asymp_sims-7.png" width="33%" /><img src="Simulations_files/figure-gfm/summary_asymp_sims-8.png" width="33%" /><img src="Simulations_files/figure-gfm/summary_asymp_sims-9.png" width="33%" />
+Table: Summary of parameter estimates from 100 simulations, where alpha_ar = 0.693 alpha_en = 1 and a leaky vaccine effect of 0.8
+
+Model               Est AR   2.5% AR   97.5% AR   Bias AR   MSE AR   Est EN   2.5% EN   97.5% EN   Bias EN   MSE EN   Est Phi   2.5% Phi   97.5% Phi   Bias Phi   MSE Phi
+-----------------  -------  --------  ---------  --------  -------  -------  --------  ---------  --------  -------  --------  ---------  ----------  ---------  --------
+All-or-none          0.692     0.653      0.717    -0.001    0.000    1.007     0.922      1.088     0.007    0.002     0.800      0.791       0.810      0.000     0.000
+Leaky                0.692     0.653      0.716    -0.001    0.000    1.011     0.927      1.093     0.011    0.002     0.804      0.794       0.814      0.004     0.000
+Ecological           0.614     0.523      0.718    -0.079    0.009    0.927     0.769      1.089    -0.073    0.012     0.767      0.698       0.835     -0.033     0.002
+Epidemic-Endemic     0.449     0.337      0.597    -0.244    0.064    0.041    -0.033      0.123    -0.959    0.922     0.621      0.598       0.650     -0.179     0.032
+
+<img src="Simulations_files/figure-html/summary_asymp_sims-1.png" width="33%" /><img src="Simulations_files/figure-html/summary_asymp_sims-2.png" width="33%" /><img src="Simulations_files/figure-html/summary_asymp_sims-3.png" width="33%" /><img src="Simulations_files/figure-html/summary_asymp_sims-4.png" width="33%" /><img src="Simulations_files/figure-html/summary_asymp_sims-5.png" width="33%" /><img src="Simulations_files/figure-html/summary_asymp_sims-6.png" width="33%" /><img src="Simulations_files/figure-html/summary_asymp_sims-7.png" width="33%" /><img src="Simulations_files/figure-html/summary_asymp_sims-8.png" width="33%" /><img src="Simulations_files/figure-html/summary_asymp_sims-9.png" width="33%" />
+
