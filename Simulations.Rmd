@@ -4,16 +4,15 @@ subtitle: "From Ecological inference for infectious disease data, with applicati
 author: "Leigh Fisher"
 date: "`r format(Sys.time(), ' %B %d %Y')`"
 output: 
-  html_document:
-      toc: true
-      code_folding: hide
-      keep_md: true
+  github_document:
+    toc: true
+    toc_depth: 1
 ---
 
     
 ```{r setup, echo=F,  message=F, warning=F}
 library(knitr)
-opts_chunk$set(comment=NA, echo=T, cache=T, tidy=F, message=F, warning=F, dev=c('png', 'pdf'), dpi=300, results='hide',  fig.height=4.5, fig.width=4.5) 
+opts_chunk$set(comment=NA, echo=F, cache=T, tidy=F, message=F, warning=F, dev=c('png', 'pdf'), dpi=300, results='hide',  fig.height=4.5, fig.width=4.5) 
 options(width=100)
 
 
@@ -46,7 +45,6 @@ source('ecofall_sim_functions.R')
 # Introduction and notes
 - This file contains code and analysis for the simulations presented in ``Ecological inference for infectious disease data, with application to vaccination strategies". 
 - All functions are found in ecofall_sim_functions.R
-- This file may take up to an hour to compile. The slowest analysis is the asymptotic analysis. I have reduced the number of simulations for those analyses, and did not re-compile.
 
 # Simulations to assess simplifying assumptions in the absence of vaccination {.tabset}
 ```{r no_vac_sim_setup, echo=F}
@@ -494,9 +492,9 @@ kable(res_r0mod, caption=paste('Summary of parameter estimates from', Nsims, 'si
 ```
 
 
-##  $R_0 = 0.75$
+##  $R_0 = 0.85$
 ```{r sim_setup_r0_lo, echo=T}
-alpha_ar = log(0.75)
+alpha_ar = log(0.85)
 
 set.seed(47)
 sim_r0lo=replicate(Nsims, sim.simple(N=N, Nwks=3*52, alpha_ar=alpha_ar, alpha_en=alpha_en))
@@ -519,7 +517,7 @@ res_r0lo = plyr::ldply(1:8, function(i){
 })
 ```
 
-Examples of simulated epidemic curves when $R_0=0.75$
+Examples of simulated epidemic curves when $R_0=0.85$
 ```{r eg_r0_lo, echo=F, fig.height=3,  out.width='55%', fig.align='center'}
 samp.sims.lo=cbind(sim_r0lo['dat', ][[1]]$Y, sim_r0lo['dat', ][[12]]$Y, sim_r0lo['dat', ][[22]]$Y, sim_r0lo['dat', ][[47]]$Y, sim_r0lo['dat', ][[54]]$Y, sim_r0lo['dat', ][[112]]$Y, sim_r0lo['dat', ][[204]]$Y, sim_r0lo['dat', ][[117]]$Y)
 samp.sims.lo=ifelse(samp.sims.lo==0, 0.5, samp.sims.lo)
@@ -675,7 +673,7 @@ mtext(1, at=c(2.5, 6.5), text=c('Binomial', 'Poisson'), line=3, cex=1)
 points(x=1:8-0.15, y=res_r0big$Bias.ar, pch=16, col=r0_cols[1])
 points(x=1:8, y=res_r0mod$Bias.ar, pch=16, col=r0_cols[2])
 points(x=1:8+0.15, y=res_r0lo$Bias.ar, pch=16, col=r0_cols[3])
-legend('top', legend=c(expression(R[0]==2.5), expression(R[0]==1), expression(R[0]==0.75)), col=r0_cols, pch=rep(16), bty='n', horiz=T, xpd=T, inset=c(0, -0.1))
+legend('top', legend=c(expression(R[0]==2.5), expression(R[0]==1), expression(R[0]==0.85)), col=r0_cols, pch=rep(16), bty='n', horiz=T, xpd=T, inset=c(0, -0.1))
 
 
 rng.en = range(res_r0big$Bias.en, res_r0mod$Bias.en, res_r0lo$Bias.en, 0, 0.05)
@@ -763,6 +761,7 @@ sts=c(0.5, 0, 1)
 
 
 Below, we plot examples of a population consisting of 5 areas
+
 ```{r sim_partial_vacc, fig.height=4.5, fig.width=5, out.width='33%', fig.show = 'hold'}
 
 pltcols=rev(brewer.pal(6, 'PuRd')[-1])

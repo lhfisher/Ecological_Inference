@@ -6,14 +6,14 @@ date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: 
   github_document:
     toc: true
-    toc_depth: 2
+    toc_depth: 1
 ---
 
     
 ```{r setup, echo=F,  message=F, warning=F}
 library(knitr)
 # IF compiling using R notebook, these options will clean up the output
-opts_chunk$set(comment=NA, echo=F, cache=T, tidy=F, message=F, warning=F, dev=c('png', 'pdf'), dpi=300, results='hide', fig.align = 'center', fig.height=8.5, fig.width=8.5)
+opts_chunk$set(comment=NA, echo=F, cache=T, tidy=F, message=F, warning=F, dev=c('png', 'pdf'), dpi=300, results='hide',  fig.height=8.5, fig.width=8.5) # fig.align = 'center',
 options(width=100)
 options(mc.cores = parallel::detectCores())
 
@@ -102,8 +102,7 @@ state_cols=colorRampPalette(brewer.pal(11, "Spectral"))(16)
 ```
 
 # Introduction and notes
-- This file contains figures and analyses presented in ``Ecological inference for infectious disease data, with application to vaccination strategies", along with additional analyses that are not discussed in detail in the primary manuscript. 
-- There are three MCMC's run through Stan in this analysis, each may take approximately 30 minutes to compile. 
+- This file contains figures and analyses presented in ``Ecological inference for infectious disease data, with application to vaccination strategies", along with additional analyses that are discussed in detail in the primary manuscript. 
 
 
 
@@ -170,77 +169,13 @@ log_lik[(i-1)*(Ts-1)+t-1 ] = poisson_lpmf(y[i, t] | (1-phi*X[i])*muit);
 }
 '
 
-### fixed effects model - to the MLE 
-mod_fe='
-data{
-int<lower=1> I;          // number of areas
-int<lower=1> Ts;         // number of times
-int<lower=1> Nobs;    // number of total observations
-int y[I, Ts] ;  // IxTs matrix of observations
-real logNi[I];          // log population sizes
-vector[I] X;            // vector of Xi vacc cover
-vector[Ts] sin1;           // vector of sin
-vector[Ts] cos1;           // vector of cos
-vector[2] a; //vector of parameters for the beta prior on phi
-}
-parameters{
-real alpha_ar;  // AR component - intercept
-real alpha_en;  // EN component - intercept
-real gamma;     // sin component
-real delta;     // cosine component 
-real<lower=0, upper=1> phi;  // vaccine effect
-}
-model{
-for(i in 1:I){
-for(t in 2:Ts){
-real muit;
-muit = exp(alpha_ar)*y[i, t-1] + exp(logNi[i] + alpha_en + gamma*sin1[t] + delta*cos1[t]);
-y[i, t] ~ poisson((1-phi*X[i])*muit);
-}
-}
-
-//priors
-alpha_ar ~ normal(0, 5);
-alpha_en ~ normal(0, 5);
-gamma ~ normal(0, 10);
-delta ~ normal(0, 10);
-phi ~ beta(a[1], a[2]);
-
-}
-generated quantities{
-vector[Nobs-I] log_lik;
-vector[I] ri; 
-for(i in 1:I){
-ri[i] = exp(alpha_ar)*(1-phi*X[i]); 
-for(t in 2:Ts){
-real muit;
-muit=exp(alpha_ar)*y[i, t-1] + exp(logNi[i] + alpha_en + gamma*sin1[t] + delta*cos1[t]);
-log_lik[(i-1)*(Ts-1)+t-1 ] = poisson_lpmf(y[i, t] | (1-phi*X[i])*muit);
-}
-}
-}
-'
 ```
 
 
-# Descriptive tables and figures
-## Measles cases and estimated vaccination coverage
-Number of measles cases and estimated vaccination coverage for the 16 German states from 2005-2007. MMR1 (MMR2) is the estimated vaccination coverage for at least 1 (2) MMR vaccine, estimated from the school entry examinations. Note this partially reproduces Table 1 from Herzog et al 2011.
-```{r descrip_tab, results='markup'}
+# Overview of Measles data
 
-data.frame(State = paste0(state_names, ' (', snames, ')'), 
-                   Population = format(pop, big.mark = ','), 
-                   Total.Cases = format(colSums(Y), big.mark = ',', digits=1),
-                   MMR1 = paste0(format(100*X1, digits=3), '%'),
-                   MMR2 = paste0(format(100*X2, digits=3), '%')
-)
-
-
-```
-
-## Summary figures
-
-```{r epicurve, fig.height=4.5, fig.width=6.5}
+### Number of cases over time, across all of Germany
+```{r epicurve, fig.height=4.5, fig.width=6.5, out.width='75%', fig.cap="Number of observed cases over time, across all of Germany", fig.align = 'center'}
 par(mar=c(2, 2.5, 1, 2.5)+0.25, oma=c(1.5, 1.5, 0.5, 1.5))
 rng=range(colSums(measlesdat$y))
 if(rng[2]==0){rng[2]=1}
@@ -264,7 +199,8 @@ mtext(text='Number of cases', side=2, line=0, outer=T)
 
 ```
 
-```{r summap, fig.height=6.5, fig.width=6.5}
+### Spatial distribution of total number of cases by state per 100,000 from 2005-2007.
+```{r summap, fig.height=6.5, fig.width=6.5, out.width='50%', fig.align='center'}
 par(mar=c(0, 1, 0, 0))
 brks=c(seq(0, 1, l=9), 2:5, 10, 12)
 plotclr=c("#FFFFFF", colorRampPalette(brewer.pal(9, "PuRd")[-1])(length(brks)-1) )
@@ -279,8 +215,9 @@ legend("left", legend=sprintf('%g', leglabs), fill=plotclr, bty="n", cex=1, ncol
 
 
 
-## Maps of the estimated proportion of individuals with at least one and two MMR vaccines.
-```{r coverage_maps, fig.height=6.5, fig.width=6.5}
+### Estimated vaccination coverage 
+Below, we plot the estimated proportion of individuals with at least one (left) and two (right) MMR vaccines.
+```{r coverage_maps, fig.height=6.5, fig.width=6.5, out.width='50%', fig.show = 'hold'}
 par(mar=c(0, 1, 0, 0))
 brks=seq(from=0.88, to=0.95, l=13)
 plotclr=colorRampPalette(brewer.pal(9, "YlOrRd"))(13) 
@@ -303,7 +240,7 @@ legend("left", legend=sprintf('%2.1f%%', leglabs), fill=plotclr, bty="n", cex=1,
 
 ```
 
-## Observed bi-weekly incidence of reported cases:
+### Observed bi-weekly incidence of reported cases:
 ```{r observed_data, fig.height=6.5, fig.width=8.5}
 
 par(mfrow=c(4, 4), mar=c(2, 2.5, 1, 2.5)+0.25, oma=c(1.5, 1.5, 0.5, 1.5))
@@ -337,9 +274,24 @@ mtext(text='Number of cases', side=2, line=0, outer=T)
 ```
 
 
+Number of measles cases and estimated vaccination coverage for the 16 German states from 2005-2007. MMR1 (MMR2) is the estimated vaccination coverage for at least 1 (2) MMR vaccine, estimated from the school entry examinations. Note this partially reproduces Table 1 from Herzog et al 2011.
+```{r descrip_tab, results='markup'}
 
-# Fit hierarchical model in Stan
-## Get prior
+data.frame(State = paste0(state_names, ' (', snames, ')'), 
+                   Population = format(pop, big.mark = ','), 
+                   Total.Cases = format(colSums(Y), big.mark = ',', digits=1),
+                   MMR1 = paste0(format(100*X1, digits=3), '%'),
+                   MMR2 = paste0(format(100*X2, digits=3), '%')
+)
+
+
+```
+
+
+
+# Primary analysis in Stan
+### Strong prior for vaccine effect
+To get the parameters for a beta distribution 90% of mass between 0.6 and 0.95:
 ```{r phi_prior, echo=T, results='markup'}
 priorch <- function(x,q1,q2,p1,p2){
   (p1-pbeta(q1,x[1],x[2]))^2 + (p2-pbeta(q2,x[1],x[2]))^2 }
@@ -350,7 +302,7 @@ q1 <- 0.6; q2 <- 0.95
 ## together, we interpret these values to say:
 ## we want 90% (p2-p1) of the mass to be between q1 and q2
 
-## solve and get the parameters for a beta distribution 90% of mass between 0.6 and 0.95
+
 opt <- optim(par=c(1,1),fn=priorch,q1=q1,q2=q2,p1=p1,p2=p2)
 opt$par
 
@@ -358,7 +310,7 @@ opt$par
 
 
 
-## Fit model and assess converged
+### Fit model and assess converged
 ```{r runstan, echo=T, results='markup'}
 
 
@@ -399,7 +351,7 @@ pairs(fit, pars=c("alpha_ar", "phi",  'alpha_en', 'gamma', 'delta', 'sigma_ar', 
 
 ```
 
-## Parameter estimates
+### Parameter estimates
 ```{r stan_ests, results='markup'}
 ## extract posterior estimates for primary parameters
 tmp=extract(fit, pars=c("alpha_ar", "phi",  'alpha_en', 'gamma', 'delta','sigma_ar', 'sigma_en'))
@@ -414,7 +366,7 @@ round(measfit_ci, digits=3)
 
 
 
-## Examine model fits
+### Model fits
 ```{r fitted_plot, fig.height=6.5, fig.width=8.5}
 
 
@@ -554,7 +506,7 @@ text(y=1:16, x=par("usr")[1]-0.1, srt = 0, adj= 1, xpd = TRUE, labels=state_name
 
 
 ## Estimates of random effects
-```{r re_ests}
+```{r re_ests, out.width='50%', fig.show='hold'}
 
 res=extract(fit, pars=c('re_ar'))
 ar_ests=apply(res$re_ar, 2, median)
@@ -585,7 +537,7 @@ abline(0, 1)
 
 ```
 
-## Examine posterior distributions
+### Examine posterior distributions
 ```{r phi_posterior, fig.height=4, fig.width=5}
 phis=extract(fit, pars=c('phi'))
 
@@ -594,7 +546,7 @@ curve(dbeta(x, 10, 2.5), from=0, to=1, ylab='', add=T, col='red')
 legend('topleft', legend=c('Prior'), col='red', lty=1, bty='n')
 ```
 
-## Plot Pearson residuals
+### Plot Pearson residuals
 ```{r plot_resids}
 # rit=(Y-Yhat)/sqrt(Yhat)
 rit=matrix(NA, nrow=16, ncol=78)
@@ -623,64 +575,9 @@ mtext(text='Pearson residuals', side=2, line=0, outer=T)
 ```
 
 
-# Additional analyses
-## Comparison of MLE vs Bayesian analysis
-### MLE estimates
-```{r define_mle_function, echo=T}
-loglik_eco=function(param, y, xi, n){
-        v=expit(param[2])
-        l=0
-        nwks=dim(y)[2]
-        ni=dim(y)[1]
-        for(i in 1:ni){
-                for(t in 2:nwks){
-                        lam=(exp(param[1])*y[i, t-1] + (n[i]/sum(n))*exp(param[3] + param[4]*sin(2*pi*t/26) + param[5]*cos(2*pi*t/26))  )
-                        l=l-dpois(y[i, t], lambda=(1-v*xi[i])*lam, log=T)
-                }
-        }
-        return(l)
-}
 
 
-
-
-```
-
-```{r est_mle, results='markdown'}
-ecomod=optim(par=c(1.5, 0, 0.5, 0.05, -0.5), fn=loglik_eco, y=measlesdat$y, xi=measlesdat$X, n=exp(measlesdat$logNi)*measlesdat$N, hessian=T, method='BFGS', control=list(reltol=1e-5))
-
-
-se=sqrt(diag(solve(ecomod$hessian)))
-
-data.frame(parameter=c('alpha_ar', 'phi', 'alpha_en', 'gamma', 'delta'), 
-           Est=c(ecomod$par[1], expit(ecomod$par[2]), ecomod$par[3:5]), 
-           SE=c(se[1], expit(se[2]), se[3:5]))
-```
-
-
-### Estimates from fixed effects Stan model
-
-```{r fixed_effects_stan_mod, results='markdown'}
-
-measlesdat2=measlesdat
-measlesdat2$a=c(1, 1) # put a flat prior on phi
-
-pmt=proc.time()
-fit_fe <- stan(
-        model_code = mod_fe,
-        chains=4, iter=4e3, # warmup = 1e3, # save_dso = T,  # warmup=7e3, # refresh=F, #  #
-        control=list(adapt_delta=0.99, max_treedepth = 15),
-        data = measlesdat2)
-(proc.time()-pmt)/60
-
-print(fit_fe, pars=c("alpha_ar", "phi",  'alpha_en', 'gamma', 'delta'), probs=c(.025,.5,.975), digits_summary = 3) # 
-
-```
-
-
-
-
-## Sensitivity analysis - measles analysis with non-informative priors
+# Sensitivity analysis (non-informative priors)
 
 ```{r runstan_sens,  results='markup'}
 
@@ -824,7 +721,7 @@ curve(dbeta(x, measlesdat$a[1], measlesdat$a[2]), from=0, to=1, ylab='', add=T, 
 legend('topleft', legend=c('Prior'), col='red', lty=1, bty='n')
 ```
 
-# Stan Models
+# Code to specify model in Stan
 Below, we print the code to define the Stan models fit in this document
 ```{r print_stan, ref.label='stan_mods', eval=F, echo=T}
 
